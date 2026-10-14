@@ -92,19 +92,22 @@ def main() -> None:
 
     drive = Drive(env("GOOGLE_SERVICE_ACCOUNT_JSON"))
     folder_ids = [f.strip() for f in env("DRIVE_FOLDER_IDS").split(",") if f.strip()]
-    store = Store(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))
     retag_all = os.environ.get("RETAG_ALL", "").lower() == "true"
 
     run_started = dt.datetime.now(dt.timezone.utc).isoformat()
     print(f"Reading Drive folders: {', '.join(drive.folder_name(f) for f in folder_ids)}")
     images = list(drive.walk_images(folder_ids))
+    if args.count:  # Drive only: works before Supabase is set up
+        total_mb = sum(i.size for i in images) / 1e6
+        folders = len({i.folder_path for i in images})
+        print(f"Found {len(images)} images ({total_mb:,.0f} MB) across {folders} folders.")
+        return
+
+    store = Store(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))
     known = store.existing()
     todo = [img for img in images if needs_tagging(img, known.get(img.id), retag_all)]
     total_mb = sum(i.size for i in images) / 1e6
     print(f"Found {len(images)} images ({total_mb:,.0f} MB). New or changed, needing tags: {len(todo)}.")
-
-    if args.count:
-        return
 
     # 1. Record every image's Drive details (cheap, no AI).
     store.upsert(
