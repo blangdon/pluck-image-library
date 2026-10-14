@@ -1,0 +1,56 @@
+# What the tagger looks for. Edit freely: new tags apply to images tagged
+# after the change. To re-tag everything with a new list, see README ("Re-tag").
+
+tags:
+  - name: pluck shaker
+    hint: A Pluck seasoning shaker, the cylindrical can with a shaker lid. Any flavour, old or new label design, render or real photo, even if small or partly hidden.
+  - name: sachet
+    hint: A Pluck stand-up pouch or sachet (flexible bag), any flavour or design.
+  - name: food
+    hint: Food or a prepared dish is visible.
+  - name: people
+    hint: A person or part of one (hands count) is visible.
+  - name: packaging
+    hint: Shipping boxes, retail displays, cases or bulk packaging, rather than a single product.
+  - name: lifestyle
+    hint: A real-world scene (kitchen, table, outdoors) rather than a plain studio background.
+  - name: product shot
+    hint: The product is the subject, usually on a plain or studio background.
+  - name: flat lay
+    hint: Shot from directly above with items arranged on a surface.
+  - name: event
+    hint: A market stall, trade show, tasting, talk or other event.
+  - name: behind the scenes
+    hint: Production, warehouse, office, photoshoot setup or team at work.
+  - name: text/graphic
+    hint: A designed graphic, ad, social tile or image with added text, badges or logos overlaid.
+  - name: video still
+    hint: A screenshot from a video, e.g. a play button or video player chrome is visible.
+
+# Known flavours. The tagger reads flavour names off labels; anything it reads
+# that matches one of these (ignoring case) is stored with this exact spelling.
+flavours:
+  - Original
+  - All-Purpose
+  - Lion Salt
+  - Cinnabrain
+  - Zesty Garlic
+  - Habanero Lime
+  - Southwest
+  - Pure Brain
+  - Pure Organs
+  - Cinnamon
+
+# Reference photos the model sees before every image (in tagger/reference/).
+# Prompt caching keeps the cost of these low.
+reference_images:
+  - file: shaker-lion-salt-new.png
+    caption: Pluck shaker, current label design (Lion Salt). The shaker is a cylindrical can with a perforated shaker lid.
+  - file: shaker-zesty-garlic-new.jpg
+    caption: Pluck shaker, current label design (Zesty Garlic).
+  - file: shaker-zesty-garlic-old-in-use.jpg
+    caption: The dark green can in this photo is a Pluck shaker in the older label design (Zesty Garlic). The food is not part of the reference.
+  - file: pouch-original-new.png
+    caption: Pluck stand-up pouch (sachet), current label design (Original).
+  - file: pouch-original-old-in-use.jpg
+    caption: The orange bag being held is a Pluck pouch (sachet) in the older design with the illustrated bull (Original). The food is not part of the reference.

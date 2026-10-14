@@ -1,0 +1,6 @@
+web/config.js
+web/demo-data.js
+__pycache__/
+*.pyc
+.env
+*service-account*.json

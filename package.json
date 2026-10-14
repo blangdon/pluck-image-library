@@ -1,0 +1,7 @@
+{
+  "name": "pluck-image-library",
+  "private": true,
+  "scripts": {
+    "build": "node web/build.js"
+  }
+}
