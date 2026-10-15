@@ -58,12 +58,13 @@ class Drive:
         return self._local.session
 
     def folder_name(self, folder_id: str) -> str:
-        try:
-            meta = self.api.files().get(fileId=folder_id, fields="name", supportsAllDrives=True).execute()
-            return meta["name"]
-        except Exception:
-            # Shared Drive ids (start with "0A") are looked up through the drives endpoint.
-            return self.api.drives().get(driveId=folder_id, fields="name").execute()["name"]
+        if folder_id.startswith("0A"):  # a Shared Drive: use its real name, not "Drive"
+            try:
+                return self.api.drives().get(driveId=folder_id, fields="name").execute()["name"]
+            except Exception:
+                pass
+        meta = self.api.files().get(fileId=folder_id, fields="name", supportsAllDrives=True).execute()
+        return meta["name"]
 
     def _children(self, folder_id: str) -> Iterator[dict]:
         token = None
