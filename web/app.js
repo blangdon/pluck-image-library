@@ -181,6 +181,7 @@
       },
       {
         id: "design", title: "Packaging (front only)", mode: "any",
+        note: "Judged from the front of the pack. Shots showing only the back or side can't be told apart, so they appear under both.",
         options: ["current", "previous"].map((d) => ({
           key: d,
           label: d === "current" ? "Current packaging" : "Old packaging",
