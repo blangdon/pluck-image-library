@@ -102,6 +102,18 @@ button, input { font: inherit; color: inherit; }
   max-height: calc(100vh - 92px); overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 18px; padding-right: 4px; min-width: 0;
 }
+.media-toggle {
+  display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px;
+  background: var(--chip); border-radius: 14px;
+}
+.media-toggle button {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+  font-family: var(--display); font-size: 16px; letter-spacing: .02em; color: var(--muted);
+}
+.media-toggle button:hover { color: var(--ink); }
+.media-toggle button[aria-pressed="true"] { background: var(--teal); color: var(--bg); box-shadow: var(--shadow); }
+.media-toggle .n { font-family: var(--mono); font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; }
 .search-hint { margin: -10px 0 0; padding-left: 4px; }
 .facet { display: grid; gap: 6px; }
 .facet-title {

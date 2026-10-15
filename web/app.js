@@ -22,6 +22,7 @@
     flavours: new Set(),
     types: new Set(),
     newOnly: false,
+    media: "image",      // "image" or "video"
     draft: "",           // what's being typed in the search box right now
     searches: [],        // pinned searches: { text, on }
     shown: [],
@@ -87,7 +88,7 @@
 
   async function loadImages() {
     const cols =
-      "id,name,folder_path,drive_url,drive_created_at,first_seen_at,description,tags,manual_tags,hidden_tags,flavours,packaging,is_render,thumb_path";
+      "id,name,folder_path,mime_type,drive_url,drive_created_at,first_seen_at,description,tags,manual_tags,hidden_tags,flavours,packaging,is_render,thumb_path";
     const rows = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb
@@ -130,7 +131,10 @@
   }
 
   // ---------------------------------------------------------------- filtering
+  const mediaOf = (img) => ((img.mime_type || "").startsWith("video/") ? "video" : "image");
+
   function matches(img, skip) {
+    if (mediaOf(img) !== state.media) return false;
     if (state.newOnly && !isNew(img)) return false;
     if (skip !== "tags") {
       const t = effectiveTags(img);
@@ -206,13 +210,22 @@
     renderChecks("type-chips", typeItems, state.types, (k) => toggle(state.types, k));
 
     renderSearches();
+    const nImages = state.images.filter((i) => mediaOf(i) === "image").length;
+    $("media-image-n").textContent = nImages.toLocaleString();
+    $("media-video-n").textContent = (state.images.length - nImages).toLocaleString();
+    $("media-image").setAttribute("aria-pressed", state.media === "image");
+    $("media-video").setAttribute("aria-pressed", state.media === "video");
+    const total = state.media === "image" ? nImages : state.images.length - nImages;
     const active = state.tags.size + state.flavours.size + state.types.size +
       state.searches.filter((q) => q.on).length + (state.newOnly ? 1 : 0) + (state.draft ? 1 : 0);
     $("clear-filters").hidden = !active;
     $("filters-count").textContent = active ? ` (${active})` : "";
     $("result-count").textContent =
-      `${state.shown.length.toLocaleString()} of ${state.images.length.toLocaleString()} images`;
+      `${state.shown.length.toLocaleString()} of ${total.toLocaleString()} ${state.media === "image" ? "images" : "videos"}`;
     $("empty").hidden = state.shown.length > 0;
+    $("empty").textContent = state.media === "video" && total === 0
+      ? "No videos yet. The library only reads images from Drive for now; videos will appear here once video support is added."
+      : `No ${state.media === "image" ? "images" : "videos"} match these filters.`;
 
     $("grid").replaceChildren();
     state.rendered = 0;
@@ -364,6 +377,9 @@
       clearTimeout(t);
       t = setTimeout(() => { state.draft = e.target.value.trim().toLowerCase(); refresh(); }, 150);
     };
+    for (const m of ["image", "video"]) {
+      $(`media-${m}`).onclick = () => { if (state.media !== m) { state.media = m; refresh(); } };
+    }
     $("search-form").onsubmit = (e) => {
       e.preventDefault();
       const text = $("search").value.trim().toLowerCase();

@@ -38,6 +38,10 @@
 
   <div class="layout" id="app" hidden>
     <aside class="sidebar" id="sidebar" aria-label="Search and filters">
+      <div class="media-toggle" role="group" aria-label="Show images or videos">
+        <button type="button" id="media-image" aria-pressed="true">Images <span class="n" id="media-image-n"></span></button>
+        <button type="button" id="media-video" aria-pressed="false">Videos <span class="n" id="media-video-n"></span></button>
+      </div>
       <form class="search" id="search-form" role="search">
         <label class="visually-hidden" for="search">Search images</label>
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
