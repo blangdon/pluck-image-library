@@ -207,6 +207,11 @@ button, input { font: inherit; color: inherit; }
 .result-bar p { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Grid */
+#grid.videos { display: flex; flex-direction: column; gap: 36px; }
+.video-group { display: grid; gap: 10px; }
+.group-title { margin: 0; display: flex; align-items: baseline; gap: 12px; font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1; color: var(--teal); }
+.group-count { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.group-blurb { margin: -4px 0 4px; color: var(--muted); font-size: 13px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 @media (max-width: 480px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
 .card {

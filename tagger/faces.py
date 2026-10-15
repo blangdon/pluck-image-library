@@ -176,7 +176,7 @@ def main() -> None:
     if not args.rematch:
         drive = Drive(env("GOOGLE_SERVICE_ACCOUNT_JSON"))
         folder_ids = [f.strip() for f in env("DRIVE_FOLDER_IDS").split(",") if f.strip()]
-        images = {i.id: i for i in drive.walk_images(folder_ids)}
+        images = {i.id: i for i in drive.walk_images(folder_ids, kinds=("image/", "video/"))}  # videos: poster frame
         todo = [i for i in images.values() if (rows.get(i.id) or {}).get("faces_md5") != (i.md5 or "x")]
         todo = todo[: int(_env("MAX_IMAGES_PER_RUN") or MAX_IMAGES_PER_RUN)]
         print(f"Scanning faces in {len(todo)} new or changed images…", flush=True)

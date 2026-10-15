@@ -53,28 +53,19 @@
   };
   const flavoursOf = (img) => [...new Set((img.flavours || []).map((f) => FLAVOUR_ALIASES[f.toLowerCase()] || f))];
   const designOf = (img) => DESIGN_NAMES[img.packaging] || img.packaging || "none";
-  // Video categories, inferred from the Drive folder (first matching rule wins).
-  const VIDEO_CATEGORIES = [
-    ["Ads", /meta ads/i],
-    ["Podcasts & press", /podcast|press features/i],
-    ["Events & talks", /events\/|conference|summit|shark tank/i],
-    ["Recipes", /recipes\//i],
-    ["Customer & creator videos", /\bugc\b|influencer|testimonial|guest content|ambassador/i],
-    ["Founder & James", /founder|james content studio|james ig reels|james barry/i],
-    ["Social reels", /social media|reels/i],
-    ["Product videos", /product videos|product photos|cutting board/i],
-    ["Farm & sourcing", /sourcing|cows on pasture/i],
-    ["Lifestyle", /lifestyle/i],
+  // Video groups, from the poster frame: James (face search), else who/what the frame focuses on.
+  const VIDEO_GROUPS = [
+    { key: "james", title: "James", blurb: "Videos with James on camera" },
+    { key: "ugc", title: "UGC", blurb: "Someone other than James is the focus" },
+    { key: "cooking", title: "Cooking", blurb: "Point-of-view food and cooking" },
+    { key: "other", title: "Other", blurb: "Graphics, products and everything else" },
   ];
-  const categoryOf = (img) => {
-    const path = (img.folder_path || "").split("/").slice(1).join("/");
-    for (const [name, re] of VIDEO_CATEGORIES) if (re.test(path)) return name;
-    return "Other";
-  };
-  const stageOf = (img) => {
-    const where = `${img.folder_path || ""}/${img.name || ""}`;
-    if (/raw|ready for editing|unedited|pending approval/i.test(where)) return "raw";
-    return "final";
+  const videoGroupOf = (img) => {
+    const t = effectiveTags(img);
+    if (t.includes("James")) return "james";
+    if (t.includes("focus: person")) return "ugc";
+    if (t.includes("focus: pov food")) return "cooking";
+    return "other";
   };
   const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
   // "New" = found since the last visit, and since the strip was last dismissed on this browser.
@@ -198,19 +189,10 @@
     const shotTags = [...allTags].filter((t) =>
       !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t));
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
-    const videoCategories = [...new Set(state.images.filter((i) => mediaOf(i) === "video").map(categoryOf))]
-      .sort((a, b) => (a === "Other") - (b === "Other") || a.localeCompare(b));
     const facets = [
       {
-        id: "category", title: "Category", mode: "any", media: "video",
-        options: videoCategories.map((c) => ({ key: c, label: c, test: (i) => categoryOf(i) === c })),
-      },
-      {
-        id: "stage", title: "Stage", mode: "any", media: "video",
-        options: [
-          { key: "final", label: "Final / edited", test: (i) => stageOf(i) === "final" },
-          { key: "raw", label: "Raw footage", test: (i) => stageOf(i) === "raw" },
-        ],
+        id: "vgroup", title: "Category", mode: "any", media: "video",
+        options: VIDEO_GROUPS.map((g) => ({ key: g.key, label: g.title, test: (i) => videoGroupOf(i) === g.key })),
       },
       {
         id: "product", title: "Pluck product", mode: "any",
@@ -276,7 +258,7 @@
     }
     const terms = [...state.searches.filter((q) => q.on).map((q) => q.text), state.draft].filter(Boolean);
     if (terms.length) {
-      const hay = [img.name, img.description, mediaOf(img) === "video" ? categoryOf(img) : "", img.folder_path, ...effectiveTags(img).map(label), ...flavoursOf(img)]
+      const hay = [img.name, img.description, mediaOf(img) === "video" ? (VIDEO_GROUPS.find((g) => g.key === videoGroupOf(img)) || {}).title : "", img.folder_path, ...effectiveTags(img).map(label), ...flavoursOf(img)]
         .join(" ").toLowerCase();
       for (const term of terms) for (const word of term.split(/\s+/)) if (word && !hay.includes(word)) return false;
     }
@@ -330,6 +312,10 @@
 
   function refresh() {
     state.shown = state.images.filter((i) => matches(i));
+    if (state.media === "video") {
+      const order = VIDEO_GROUPS.map((g) => g.key);
+      state.shown.sort((a, b) => order.indexOf(videoGroupOf(a)) - order.indexOf(videoGroupOf(b)));
+    }
 
     // Sidebar groups. "any" groups count against everything except their own ticks; "all" groups
     // count within the current result.
@@ -374,6 +360,7 @@
       : `No ${state.media === "image" ? "images" : "videos"} match these filters.`;
 
     $("grid").replaceChildren();
+    $("grid").classList.toggle("videos", state.media === "video");
     state.rendered = 0;
     renderMore();
   }
@@ -391,7 +378,26 @@
     return b;
   }
 
+  function renderVideoGroups() {
+    const sections = [];
+    let index = 0;
+    for (const g of VIDEO_GROUPS) {
+      const items = state.shown.filter((i) => videoGroupOf(i) === g.key);
+      if (!items.length) continue;
+      const grid = el("div", { className: "grid" });
+      for (const img of items) grid.append(card(img, state.shown.indexOf(img)));
+      index += items.length;
+      sections.push(el("section", { className: "video-group" },
+        el("h2", { className: "group-title" }, g.title, el("span", { className: "group-count", textContent: items.length })),
+        el("p", { className: "group-blurb", textContent: g.blurb }),
+        grid));
+    }
+    $("grid").append(...sections);
+    state.rendered = state.shown.length;
+  }
+
   function renderMore() {
+    if (state.media === "video") return renderVideoGroups();
     const end = Math.min(state.rendered + PAGE, state.shown.length);
     const frag = document.createDocumentFragment();
     for (let i = state.rendered; i < end; i++) frag.append(card(state.shown[i], i));
@@ -466,7 +472,7 @@
     $("v-added").textContent = fmtDate(img.drive_created_at);
     const d = designOf(img);
     if (mediaOf(img) === "video") {
-      $("v-type").textContent = `${categoryOf(img)} · ${stageOf(img) === "raw" ? "raw footage" : "final / edited"}`;
+      $("v-type").textContent = `Video · ${(VIDEO_GROUPS.find((g) => g.key === videoGroupOf(img)) || {}).title}`;
     } else {
       $("v-type").textContent = (img.is_render ? "Render / mockup" : "Real photo") + (DESIGN_TEXT[d] ? ` · ${DESIGN_TEXT[d]}` : "");
     }
