@@ -22,7 +22,8 @@
     flavours: new Set(),
     types: new Set(),
     newOnly: false,
-    query: "",
+    draft: "",           // what's being typed in the search box right now
+    searches: [],        // pinned searches: { text, on }
     shown: [],
     rendered: 0,
     viewerIndex: -1,
@@ -141,24 +142,40 @@
     if (skip !== "types") {
       for (const id of state.types) if (!TYPE_FILTERS.find((f) => f.id === id).test(img)) return false;
     }
-    if (state.query) {
+    const terms = [...state.searches.filter((q) => q.on).map((q) => q.text), state.draft].filter(Boolean);
+    if (terms.length) {
       const hay = [img.name, img.description, img.folder_path, ...effectiveTags(img), ...(img.flavours || [])]
         .join(" ").toLowerCase();
-      for (const word of state.query.split(/\s+/)) if (word && !hay.includes(word)) return false;
+      for (const term of terms) for (const word of term.split(/\s+/)) if (word && !hay.includes(word)) return false;
     }
     return true;
   }
 
-  function renderChips(containerId, items, selected, onToggle) {
-    const box = $(containerId);
-    box.replaceChildren(
+  function renderChecks(containerId, items, selected, onToggle) {
+    $(containerId).replaceChildren(
       ...items.map(({ key, label, count }) => {
         const on = selected.has(key);
-        const b = el("button", { type: "button", className: "chip", disabled: !on && count === 0 },
-          label, el("span", { className: "n", textContent: count }));
-        b.setAttribute("aria-pressed", on);
-        b.onclick = () => { onToggle(key); refresh(); };
-        return b;
+        const box = el("input", { type: "checkbox", checked: on, disabled: !on && count === 0 });
+        box.onchange = () => { onToggle(key); refresh(); };
+        return el("label", { className: "check" + (!on && count === 0 ? " zero" : "") },
+          box, el("span", { className: "label", textContent: label }), el("span", { className: "n", textContent: count }));
+      })
+    );
+  }
+
+  function renderSearches() {
+    const box = $("search-list");
+    box.hidden = !state.searches.length;
+    $("search-list-items").replaceChildren(
+      ...state.searches.map((q, i) => {
+        const tick = el("input", { type: "checkbox", checked: q.on });
+        tick.setAttribute("aria-label", `Use search "${q.text}"`);
+        tick.onchange = () => { q.on = tick.checked; refresh(); };
+        const x = el("button", { type: "button", className: "remove", textContent: "×" });
+        x.setAttribute("aria-label", `Remove search "${q.text}"`);
+        x.onclick = () => { state.searches.splice(i, 1); refresh(); };
+        return el("div", { className: "check search-item" + (q.on ? "" : " off") },
+          el("label", {}, tick, el("span", { className: "label", textContent: `“${q.text}”` })), x);
       })
     );
   }
@@ -175,7 +192,7 @@
     const tagItems = [...tagCounts.keys()]
       .sort((a, b) => (tagCounts.get(b) - tagCounts.get(a)) || a.localeCompare(b))
       .map((t) => ({ key: t, label: t, count: tagCounts.get(t) }));
-    renderChips("tag-chips", tagItems, state.tags, (k) => toggle(state.tags, k));
+    renderChecks("tag-chips", tagItems, state.tags, (k) => toggle(state.tags, k));
 
     // Flavour chips combine with OR, so count against everything but the flavour filter.
     const base = state.images.filter((i) => matches(i, "flavours"));
@@ -183,13 +200,16 @@
     for (const i of state.images) for (const f of i.flavours || []) flav.set(f, 0);
     for (const i of base) for (const f of i.flavours || []) flav.set(f, flav.get(f) + 1);
     const flavItems = [...flav.keys()].sort().map((f) => ({ key: f, label: f, count: flav.get(f) }));
-    renderChips("flavour-chips", flavItems, state.flavours, (k) => toggle(state.flavours, k));
+    renderChecks("flavour-chips", flavItems, state.flavours, (k) => toggle(state.flavours, k));
 
     const typeItems = TYPE_FILTERS.map((f) => ({ key: f.id, label: f.label, count: state.shown.filter(f.test).length }));
-    renderChips("type-chips", typeItems, state.types, (k) => toggle(state.types, k));
+    renderChecks("type-chips", typeItems, state.types, (k) => toggle(state.types, k));
 
-    const any = state.tags.size || state.flavours.size || state.types.size || state.newOnly || state.query;
-    $("clear-filters").hidden = !any;
+    renderSearches();
+    const active = state.tags.size + state.flavours.size + state.types.size +
+      state.searches.filter((q) => q.on).length + (state.newOnly ? 1 : 0) + (state.draft ? 1 : 0);
+    $("clear-filters").hidden = !active;
+    $("filters-count").textContent = active ? ` (${active})` : "";
     $("result-count").textContent =
       `${state.shown.length.toLocaleString()} of ${state.images.length.toLocaleString()} images`;
     $("empty").hidden = state.shown.length > 0;
@@ -342,10 +362,31 @@
     let t;
     $("search").oninput = (e) => {
       clearTimeout(t);
-      t = setTimeout(() => { state.query = e.target.value.trim().toLowerCase(); refresh(); }, 150);
+      t = setTimeout(() => { state.draft = e.target.value.trim().toLowerCase(); refresh(); }, 150);
+    };
+    $("search-form").onsubmit = (e) => {
+      e.preventDefault();
+      const text = $("search").value.trim().toLowerCase();
+      if (text && !state.searches.some((q) => q.text === text)) state.searches.push({ text, on: true });
+      $("search").value = "";
+      state.draft = "";
+      refresh();
+    };
+    $("filters-toggle").onclick = () => {
+      const open = document.body.classList.toggle("filters-open");
+      $("filters-toggle").setAttribute("aria-expanded", open);
+    };
+    document.addEventListener("click", (e) => {
+      if (document.body.classList.contains("filters-open") &&
+          !$("sidebar").contains(e.target) && !$("filters-toggle").contains(e.target)) $("filters-done").click();
+    });
+    $("filters-done").onclick = () => {
+      document.body.classList.remove("filters-open");
+      $("filters-toggle").setAttribute("aria-expanded", "false");
     };
     $("clear-filters").onclick = () => {
-      state.tags.clear(); state.flavours.clear(); state.types.clear(); state.query = ""; state.newOnly = false;
+      state.tags.clear(); state.flavours.clear(); state.types.clear(); state.searches = []; state.draft = "";
+      state.newOnly = false;
       $("search").value = "";
       $("new-toggle").setAttribute("aria-pressed", "false");
       $("new-toggle").textContent = "Show only new";

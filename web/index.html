@@ -15,10 +15,7 @@
       <span class="wordmark">PLUCK</span>
       <span class="brand-sub">Image Library</span>
     </div>
-    <label class="search" for="search">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <input id="search" type="search" placeholder="Search names, descriptions, folders" autocomplete="off">
-    </label>
+    <button class="btn small filters-toggle" id="filters-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Filters<span id="filters-count"></span></button>
     <div class="account" id="account" hidden>
       <span id="account-email"></span>
       <button class="link-btn" id="sign-out" type="button">Sign out</button>
@@ -39,39 +36,59 @@
     <button class="btn" id="sign-out-2" type="button">Sign out</button>
   </section>
 
-  <main id="app" hidden>
-    <section class="new-strip" id="new-strip" hidden>
-      <div class="new-head">
-        <h2 id="new-title"></h2>
-        <button class="btn small" id="new-toggle" type="button" aria-pressed="false">Show only new</button>
-      </div>
-      <div class="new-row" id="new-row"></div>
-    </section>
+  <div class="layout" id="app" hidden>
+    <aside class="sidebar" id="sidebar" aria-label="Search and filters">
+      <form class="search" id="search-form" role="search">
+        <label class="visually-hidden" for="search">Search images</label>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Search, then press Enter" autocomplete="off" enterkeyhint="search">
+      </form>
+      <p class="hint search-hint">Each search you enter is kept below, so you can stack them.</p>
 
-    <section class="filters" aria-label="Filters">
-      <div class="filter-group">
-        <span class="filter-label">Contains</span>
-        <div class="chips" id="tag-chips"></div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Flavour</span>
-        <div class="chips" id="flavour-chips"></div>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Type</span>
-        <div class="chips" id="type-chips"></div>
-      </div>
-    </section>
+      <section class="facet" id="search-list" hidden>
+        <h2 class="facet-title">Searches</h2>
+        <div class="checks" id="search-list-items"></div>
+      </section>
 
-    <div class="result-bar">
-      <p id="result-count" aria-live="polite"></p>
-      <button class="link-btn" id="clear-filters" type="button" hidden>Clear filters</button>
-    </div>
+      <section class="facet">
+        <h2 class="facet-title">Contains</h2>
+        <div class="checks" id="tag-chips"></div>
+      </section>
 
-    <section class="grid" id="grid" aria-label="Images"></section>
-    <div id="sentinel" aria-hidden="true"></div>
-    <p class="empty" id="empty" hidden>No images match these filters.</p>
-  </main>
+      <section class="facet">
+        <h2 class="facet-title">Flavour</h2>
+        <div class="checks" id="flavour-chips"></div>
+      </section>
+
+      <section class="facet">
+        <h2 class="facet-title">Type</h2>
+        <div class="checks" id="type-chips"></div>
+      </section>
+
+      <div class="sidebar-foot">
+        <button class="link-btn" id="clear-filters" type="button" hidden>Clear all filters</button>
+        <button class="btn small filters-done" id="filters-done" type="button">Show images</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="new-strip" id="new-strip" hidden>
+        <div class="new-head">
+          <h2 id="new-title"></h2>
+          <button class="btn small" id="new-toggle" type="button" aria-pressed="false">Show only new</button>
+        </div>
+        <div class="new-row" id="new-row"></div>
+      </section>
+
+      <div class="result-bar">
+        <p id="result-count" aria-live="polite"></p>
+      </div>
+
+      <section class="grid" id="grid" aria-label="Images"></section>
+      <div id="sentinel" aria-hidden="true"></div>
+      <p class="empty" id="empty" hidden>No images match these filters.</p>
+    </main>
+  </div>
 
   <p class="status" id="status" hidden></p>
 
