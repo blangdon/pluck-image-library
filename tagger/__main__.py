@@ -67,12 +67,28 @@ def fetch_pixels(drive: Drive, img: DriveImage):
         return open_rgb(drive.preview(img))  # RAW, PSD, SVG and other formats Pillow can't read
 
 
+def is_video(img: DriveImage) -> bool:
+    return img.mime_type.startswith("video/")
+
+
 def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, attempts: int, version: int) -> str:
     try:
-        pixels = fetch_pixels(drive, img)
         thumb_path = f"{img.id}-{(img.md5 or 'x')[:8]}.jpg"
-        store.upload_thumb(thumb_path, to_jpeg(pixels, THUMB_EDGE, THUMB_QUALITY))
-        result = tagger.tag(to_jpeg(pixels, TAG_EDGE, TAG_QUALITY))
+        if is_video(img):
+            from .video import frames_sheet
+
+            sheet, middle = frames_sheet(drive, img)
+            try:
+                thumb = open_rgb(drive.preview(img, 800))  # Drive's own poster frame
+            except Exception:
+                thumb = middle
+            pixels = thumb
+            store.upload_thumb(thumb_path, to_jpeg(thumb, THUMB_EDGE, THUMB_QUALITY))
+            result = tagger.tag(to_jpeg(sheet, TAG_EDGE, TAG_QUALITY), video=True)
+        else:
+            pixels = fetch_pixels(drive, img)
+            store.upload_thumb(thumb_path, to_jpeg(pixels, THUMB_EDGE, THUMB_QUALITY))
+            result = tagger.tag(to_jpeg(pixels, TAG_EDGE, TAG_QUALITY))
         store.update(
             img.id,
             {
@@ -130,7 +146,7 @@ def main() -> None:
         print("\n".join(lines))
         print("::notice title=Video count::" + "%0A".join(lines), flush=True)
         return
-    images = list(drive.walk_images(folder_ids))
+    images = list(drive.walk_images(folder_ids, kinds=("image/", "video/")))
     if args.count:  # Drive only: works before Supabase is set up
         total_mb = sum(i.size for i in images) / 1e6
         folders = len({i.folder_path for i in images})
@@ -139,7 +155,7 @@ def main() -> None:
     if args.compare:
         from .compare import run as compare
 
-        compare(drive, images, args.compare, env("ANTHROPIC_API_KEY"), fetch_pixels)
+        compare(drive, [i for i in images if not is_video(i)], args.compare, env("ANTHROPIC_API_KEY"), fetch_pixels)
         return
 
     store = Store(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))
@@ -175,6 +191,9 @@ def main() -> None:
 
     model = os.environ.get("TAG_MODEL") or "claude-sonnet-5-5"
     cap = int(os.environ.get("MAX_IMAGES_PER_RUN") or 400)
+    only = (os.environ.get("ONLY_KIND") or "").strip()  # "images" or "videos" to tag just one kind
+    if only in ("images", "videos"):
+        todo = [i for i in todo if is_video(i) == (only == "videos")]
     todo.sort(key=lambda i: i.created or "", reverse=True)
     batch = todo[:cap]
     if not batch:

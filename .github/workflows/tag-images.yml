@@ -14,6 +14,11 @@ on:
         description: "Most images to tag in this run (blank = default 400)"
         required: false
         default: ""
+      kind:
+        description: "Which files to tag in this run"
+        type: choice
+        options: [all, images, videos]
+        default: all
       retag_all:
         description: "Re-tag every image (only after changing tagger/config.yaml)"
         type: boolean
@@ -44,6 +49,7 @@ jobs:
           TAG_MODEL: ${{ vars.TAG_MODEL }}
           MAX_IMAGES_PER_RUN: ${{ inputs.limit || vars.MAX_IMAGES_PER_RUN }}
           RETAG_ALL: ${{ inputs.retag_all }}
+          ONLY_KIND: ${{ inputs.kind }}
         run: |
           if [ "${{ inputs.mode }}" = "faces" ] || [ "${{ inputs.mode }}" = "rematch" ]; then
             echo "Skipping AI tagging in ${{ inputs.mode }} mode."

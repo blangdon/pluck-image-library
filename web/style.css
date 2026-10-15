@@ -218,6 +218,12 @@ button, input { font: inherit; color: inherit; }
 .card .frame.render { background: #ffffff; }
 .card .frame.render img { object-fit: contain; padding: 10%; }
 .card .name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .frame { position: relative; }
+.badge-play {
+  position: absolute; right: 8px; bottom: 8px; width: 30px; height: 30px; border-radius: 999px;
+  display: grid; place-items: center; font-size: 12px; padding-left: 2px;
+  background: rgba(10, 20, 18, .7); color: #fff;
+}
 .badge-new {
   position: absolute; top: 8px; left: 8px; background: var(--accent); color: var(--accent-ink);
   font-family: var(--display); font-size: 11px; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px;

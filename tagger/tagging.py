@@ -92,16 +92,23 @@ class Tagger:
             blocks[-1]["cache_control"] = {"type": "ephemeral"}
         return blocks
 
-    def tag(self, jpeg: bytes) -> dict:
+    def tag(self, jpeg: bytes, video: bool = False) -> dict:
         try:
-            return self._tag_once(jpeg)
+            return self._tag_once(jpeg, video)
         except RuntimeError:
-            return self._tag_once(jpeg)  # an occasional empty answer usually works second time
+            return self._tag_once(jpeg, video)  # an occasional empty answer usually works second time
 
-    def _tag_once(self, jpeg: bytes) -> dict:
+    def _tag_once(self, jpeg: bytes, video: bool = False) -> dict:
+        intro = (
+            "Video to tag. This is a sheet of 6 frames taken evenly through one video, left to right then "
+            "top to bottom. Tag everything that appears in any frame, and describe the video as a whole. "
+            "Don't use the \"video still\" or \"flat lay\" tags unless they truly fit; is_render is true only "
+            "for animated or 3D-rendered videos."
+            if video else "Image to tag:"
+        )
         content = [
             *self.reference_blocks,
-            {"type": "text", "text": "Image to tag:"},
+            {"type": "text", "text": intro},
             _image_block(jpeg),
             {"type": "text", "text": INSTRUCTIONS},
         ]

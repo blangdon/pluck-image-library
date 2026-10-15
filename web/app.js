@@ -346,6 +346,7 @@
       el("img", { src: state.urls.get(img.thumb_path) || "", alt: "", loading: "lazy", decoding: "async" }));
     b.append(frame);
     if (isNew(img)) b.append(el("span", { className: "badge-new", textContent: "NEW" }));
+    if (mediaOf(img) === "video") frame.append(el("span", { className: "badge-play", textContent: "▶" }));
     b.append(el("span", { className: "name", textContent: img.name }));
     b.onclick = () => openViewer(index);
     return b;
