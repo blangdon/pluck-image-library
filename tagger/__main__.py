@@ -33,6 +33,7 @@ from .store import Store
 THUMB_EDGE, THUMB_QUALITY = 800, 80  # what the gallery shows
 TAG_EDGE, TAG_QUALITY = 1280, 85  # what the model sees
 MAX_ATTEMPTS = 3
+TAG_VIDEOS = os.environ.get("TAG_VIDEOS", "").lower() == "true"  # off: videos are indexed with a thumbnail only
 
 
 def env(name: str, default: str | None = None) -> str:
@@ -48,6 +49,8 @@ def needs_tagging(img: DriveImage, row: dict | None, retag_all: bool, version: i
         return True  # never seen before
     if retag_all or (img.md5 and row.get("md5") and img.md5 != row["md5"]):
         return True  # asked to re-tag, or the file's content changed
+    if row.get("tagged_at") and str(row.get("tag_model") or "").startswith("index-only") and not TAG_VIDEOS:
+        return False  # video already indexed; AI tagging of videos is switched off
     if row.get("tagged_at") and not str(row.get("tag_model") or "").endswith(f"|v{version}"):
         return True  # tagged under older rules (config.yaml version changed)
     if row.get("tagged_at") is None:
@@ -74,6 +77,21 @@ def is_video(img: DriveImage) -> bool:
 def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, attempts: int, version: int) -> str:
     try:
         thumb_path = f"{img.id}-{(img.md5 or 'x')[:8]}.jpg"
+        if is_video(img) and not TAG_VIDEOS:
+            # Index only: Drive's poster frame (or one grabbed frame) as the thumbnail; no AI.
+            try:
+                thumb = open_rgb(drive.preview(img, 800))
+            except Exception:
+                from .video import frames_sheet
+
+                thumb = frames_sheet(drive, img)[1]
+            store.upload_thumb(thumb_path, to_jpeg(thumb, THUMB_EDGE, THUMB_QUALITY))
+            store.update(img.id, {
+                "thumb_path": thumb_path, "width": img.width or thumb.width, "height": img.height or thumb.height,
+                "tagged_at": dt.datetime.now(dt.timezone.utc).isoformat(), "tag_model": f"index-only|v{version}",
+                "tag_error": None, "tag_attempts": 0,
+            })
+            return f"indexed {img.folder_path}/{img.name} | label: video | flavour: -"
         if is_video(img):
             from .video import frames_sheet
 

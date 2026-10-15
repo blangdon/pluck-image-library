@@ -53,6 +53,29 @@
   };
   const flavoursOf = (img) => [...new Set((img.flavours || []).map((f) => FLAVOUR_ALIASES[f.toLowerCase()] || f))];
   const designOf = (img) => DESIGN_NAMES[img.packaging] || img.packaging || "none";
+  // Video categories, inferred from the Drive folder (first matching rule wins).
+  const VIDEO_CATEGORIES = [
+    ["Ads", /meta ads/i],
+    ["Podcasts & press", /podcast|press features/i],
+    ["Events & talks", /events\/|conference|summit|shark tank/i],
+    ["Recipes", /recipes\//i],
+    ["Customer & creator videos", /\bugc\b|influencer|testimonial|guest content|ambassador/i],
+    ["Founder & James", /founder|james content studio|james ig reels|james barry/i],
+    ["Social reels", /social media|reels/i],
+    ["Product videos", /product videos|product photos|cutting board/i],
+    ["Farm & sourcing", /sourcing|cows on pasture/i],
+    ["Lifestyle", /lifestyle/i],
+  ];
+  const categoryOf = (img) => {
+    const path = (img.folder_path || "").split("/").slice(1).join("/");
+    for (const [name, re] of VIDEO_CATEGORIES) if (re.test(path)) return name;
+    return "Other";
+  };
+  const stageOf = (img) => {
+    const where = `${img.folder_path || ""}/${img.name || ""}`;
+    if (/raw|ready for editing|unedited|pending approval/i.test(where)) return "raw";
+    return "final";
+  };
   const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
   // "New" = found since the last visit, and since the strip was last dismissed on this browser.
   const DISMISS_KEY = "pluck-new-dismissed-at";
@@ -175,7 +198,20 @@
     const shotTags = [...allTags].filter((t) =>
       !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t));
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
+    const videoCategories = [...new Set(state.images.filter((i) => mediaOf(i) === "video").map(categoryOf))]
+      .sort((a, b) => (a === "Other") - (b === "Other") || a.localeCompare(b));
     const facets = [
+      {
+        id: "category", title: "Category", mode: "any", media: "video",
+        options: videoCategories.map((c) => ({ key: c, label: c, test: (i) => categoryOf(i) === c })),
+      },
+      {
+        id: "stage", title: "Stage", mode: "any", media: "video",
+        options: [
+          { key: "final", label: "Final / edited", test: (i) => stageOf(i) === "final" },
+          { key: "raw", label: "Raw footage", test: (i) => stageOf(i) === "raw" },
+        ],
+      },
       {
         id: "product", title: "Pluck product", mode: "any",
         options: [
@@ -214,6 +250,7 @@
         ],
       },
     ];
+    for (const f of facets) f.media ||= "image";
     for (const f of facets) {
       f.byKey = new Map(f.options.map((o) => [o.key, o]));
       state.include[f.id] ||= new Set();
@@ -226,6 +263,7 @@
     if (mediaOf(img) !== state.media) return false;
     if (state.newOnly && !isNew(img)) return false;
     for (const f of state.facets) {
+      if (f.media !== state.media) continue;
       const inc = state.include[f.id];
       if (f.id !== skip && inc.size) {
         const hits = [...inc].map((k) => f.byKey.get(k)).filter(Boolean).map((o) => o.test(img));
@@ -238,7 +276,7 @@
     }
     const terms = [...state.searches.filter((q) => q.on).map((q) => q.text), state.draft].filter(Boolean);
     if (terms.length) {
-      const hay = [img.name, img.description, img.folder_path, ...effectiveTags(img).map(label), ...flavoursOf(img)]
+      const hay = [img.name, img.description, mediaOf(img) === "video" ? categoryOf(img) : "", img.folder_path, ...effectiveTags(img).map(label), ...flavoursOf(img)]
         .join(" ").toLowerCase();
       for (const term of terms) for (const word of term.split(/\s+/)) if (word && !hay.includes(word)) return false;
     }
@@ -297,6 +335,7 @@
     // count within the current result.
     const sections = [];
     for (const f of state.facets) {
+      if (f.media !== state.media) continue;
       const inc = state.include[f.id], exc = state.exclude[f.id];
       const base = f.mode === "any" ? state.images.filter((i) => matches(i, f.id)) : state.shown;
       let items = f.options.map((o) => ({ key: o.key, label: o.label, count: base.filter(o.test).length }));
@@ -426,7 +465,11 @@
     $("v-folder").textContent = img.folder_path || "";
     $("v-added").textContent = fmtDate(img.drive_created_at);
     const d = designOf(img);
-    $("v-type").textContent = (img.is_render ? "Render / mockup" : "Real photo") + (DESIGN_TEXT[d] ? ` · ${DESIGN_TEXT[d]}` : "");
+    if (mediaOf(img) === "video") {
+      $("v-type").textContent = `${categoryOf(img)} · ${stageOf(img) === "raw" ? "raw footage" : "final / edited"}`;
+    } else {
+      $("v-type").textContent = (img.is_render ? "Render / mockup" : "Real photo") + (DESIGN_TEXT[d] ? ` · ${DESIGN_TEXT[d]}` : "");
+    }
     $("v-flavours").textContent = flavoursOf(img).join(", ") || "None visible";
     $("v-drive").href = img.drive_url || "#";
     $("v-prev").hidden = state.viewerIndex <= 0;
