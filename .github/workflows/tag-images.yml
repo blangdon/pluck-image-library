@@ -6,9 +6,9 @@ on:
   workflow_dispatch:         # "Run workflow" button in the Actions tab
     inputs:
       mode:
-        description: "count = just count images (free); tag = index and tag"
+        description: "tag = index and tag; count = just count images (free); compare = Sonnet vs Haiku on 50 images (under $1)"
         type: choice
-        options: [tag, count]
+        options: [tag, count, compare]
         default: tag
       retag_all:
         description: "Re-tag every image (only after changing tagger/config.yaml)"
@@ -43,6 +43,14 @@ jobs:
         run: |
           if [ "${{ inputs.mode }}" = "count" ]; then
             python -m tagger --count
+          elif [ "${{ inputs.mode }}" = "compare" ]; then
+            python -m tagger --compare 50
           else
             python -m tagger
           fi
+      - name: Save comparison report
+        if: ${{ inputs.mode == 'compare' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparison-report
+          path: comparison-report.html

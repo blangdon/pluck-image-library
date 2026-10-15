@@ -51,7 +51,8 @@ Nothing is ever written to Drive. The tagger has read-only access.
 
    Optional **Variables** (same page, Variables tab): `TAG_MODEL` (default `claude-sonnet-5-5`; `claude-haiku-5-5` is cheaper) and `MAX_IMAGES_PER_RUN` (default 400).
 3. **Actions** → **Tag new Drive images** → **Run workflow** with mode **count**. This is free: it checks access and reports how many images there are.
-4. Run it again with mode **tag**. After that it runs by itself every hour. The first backlog is worked through 400 images per run.
+4. Optional: run it with mode **compare** (needs only the Anthropic key, costs under US$1). It tags 50 random images with both Sonnet and Haiku and shows where they disagree, so you can choose a model. Set `TAG_MODEL` to `claude-haiku-5-5` if Haiku is good enough.
+5. Run it again with mode **tag**. After that it runs by itself every hour. The first backlog is worked through 400 images per run.
 
 ### 5. Vercel: the gallery website
 1. vercel.com → sign in with GitHub → **Add New** → **Project** → import the repository.

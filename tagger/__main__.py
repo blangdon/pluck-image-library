@@ -1,6 +1,7 @@
 """Pluck Image Library tagger.
 
     python -m tagger --count     # how many images there are and how many need tagging (no AI calls)
+    python -m tagger --compare 50  # Sonnet vs Haiku on 50 random images (no gallery changes)
     python -m tagger             # index Drive, tag new/changed images, upload thumbnails
 
 Settings come from environment variables (GitHub Actions secrets):
@@ -88,6 +89,7 @@ def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, att
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", action="store_true", help="count images only; no tagging or uploads")
+    ap.add_argument("--compare", type=int, metavar="N", help="tag N random images with Sonnet and Haiku and compare")
     args = ap.parse_args()
 
     drive = Drive(env("GOOGLE_SERVICE_ACCOUNT_JSON"))
@@ -101,6 +103,11 @@ def main() -> None:
         total_mb = sum(i.size for i in images) / 1e6
         folders = len({i.folder_path for i in images})
         print(f"Found {len(images)} images ({total_mb:,.0f} MB) across {folders} folders.")
+        return
+    if args.compare:
+        from .compare import run as compare
+
+        compare(drive, images, args.compare, env("ANTHROPIC_API_KEY"), fetch_pixels)
         return
 
     store = Store(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))

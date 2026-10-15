@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import threading
 from pathlib import Path
 
 import anthropic
@@ -35,6 +36,8 @@ class Tagger:
         self.flavours = {f.lower(): f for f in config["flavours"]}
         self.tool = self._tool(config)
         self.reference_blocks = self._references(config.get("reference_images", []))
+        self.usage = {"input": 0, "cache_read": 0, "cache_write": 0, "output": 0}
+        self._lock = threading.Lock()
 
     def _tool(self, config: dict) -> dict:
         tag_help = "; ".join(f"{t['name']}: {t['hint']}" for t in config["tags"])
@@ -96,6 +99,12 @@ class Tagger:
             tool_choice={"type": "tool", "name": "record_tags"},
             messages=[{"role": "user", "content": content}],
         )
+        with self._lock:
+            u = msg.usage
+            self.usage["input"] += u.input_tokens
+            self.usage["cache_read"] += getattr(u, "cache_read_input_tokens", 0) or 0
+            self.usage["cache_write"] += getattr(u, "cache_creation_input_tokens", 0) or 0
+            self.usage["output"] += u.output_tokens
         result = next(b.input for b in msg.content if b.type == "tool_use")
         return self.clean(result)
 
