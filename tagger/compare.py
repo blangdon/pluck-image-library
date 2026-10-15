@@ -50,7 +50,7 @@ def run(drive, images, n: int, api_key: str, fetch_pixels) -> None:
             results = {m: t.tag(jpeg) for m, t in taggers.items()}
             return img, to_jpeg(pixels, 360, 70), results, None
         except Exception as e:
-            return img, None, {}, str(e)
+            return img, None, {}, f"{type(e).__name__}: {e}"
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         rows = list(pool.map(one, sample))
@@ -90,7 +90,13 @@ def run(drive, images, n: int, api_key: str, fetch_pixels) -> None:
         per = c / max(len(ok), 1)
         lines.append(f"| {label(m)} | ${c:.2f} | ${per * len(images):.2f} for {len(images)} images |")
     if len(rows) > len(ok):
-        lines += ["", f"{len(rows) - len(ok)} images couldn't be read and were skipped."]
+        from collections import Counter
+
+        reasons = Counter(r[3][:300] for r in rows if r[3])
+        lines += ["", f"{len(rows) - len(ok)} images failed. Reasons:", ""]
+        for reason, n in reasons.most_common(5):
+            lines.append(f"- {n}× `{reason}`")
+            print(f"::warning title=Tagging failed ({n} images)::{reason}", flush=True)
     lines += ["", "Download **comparison-report** below to see every disagreement with its picture."]
 
     summary = "\n".join(lines)
