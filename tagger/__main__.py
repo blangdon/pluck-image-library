@@ -226,6 +226,10 @@ def main() -> None:
         + "%0A".join(l[:220] for l in lines[:25]),
         flush=True,
     )
+    from . import video as _video
+
+    if _video.stream_errors:
+        print("::warning title=Video streaming fell back to download::" + "%0A".join(e[:400] for e in _video.stream_errors))
     left = len(todo) - len(batch)
     print(
         f"Done in {time.time() - started:,.0f}s: {len(batch) - failures} tagged, {failures} failed"
