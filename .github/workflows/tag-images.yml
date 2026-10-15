@@ -2,7 +2,7 @@ name: Tag new Drive images
 
 on:
   schedule:
-    - cron: "17 * * * *"   # every hour
+    - cron: "17 18,23,4 * * *"   # 3x a day: ~7am, 12pm, 5pm NZ (daylight time)
   workflow_dispatch:         # "Run workflow" button in the Actions tab
     inputs:
       mode:
