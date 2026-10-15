@@ -38,7 +38,8 @@ MAX_ATTEMPTS = 3
 def env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name, default)
     if not value:
-        sys.exit(f"Missing setting {name}. Add it as a GitHub Actions secret (see README).")
+        print(f"::error title=Missing setting::{name}. Add it as a GitHub Actions secret (see README).")
+        sys.exit(1)
     return value
 
 
@@ -169,4 +170,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:  # surface the reason on the run's summary page
+        import traceback
+
+        traceback.print_exc()
+        where = traceback.extract_tb(e.__traceback__)[-1]
+        print(f"::error title=Tagger stopped::{type(e).__name__}: {e} (at {where.filename.split('/')[-1]}:{where.lineno})")
+        sys.exit(1)
