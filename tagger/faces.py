@@ -186,13 +186,10 @@ def main() -> None:
                 old = by_external.get(img.id)
                 if old:
                     faces.delete(old)
-                if img.size and img.size > MAX_DOWNLOAD_BYTES:
-                    pixels = open_rgb(drive.preview(img))
-                else:
-                    try:
-                        pixels = open_rgb(drive.preview(img, 1600))
-                    except Exception:
-                        pixels = open_rgb(drive.download(img))
+                try:
+                    pixels = open_rgb(drive.preview(img, 1600))
+                except Exception:
+                    pixels = open_rgb(drive.download(img))  # no Drive preview (e.g. big TIFF)
                 n = faces.index(_jpeg(pixels), img.id)
                 store.update(img.id, {"faces_md5": img.md5 or "x"})
                 return n, None

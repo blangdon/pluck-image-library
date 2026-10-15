@@ -57,7 +57,10 @@ def needs_tagging(img: DriveImage, row: dict | None, retag_all: bool, version: i
 
 def fetch_pixels(drive: Drive, img: DriveImage):
     if img.size and img.size > MAX_DOWNLOAD_BYTES:
-        return open_rgb(drive.preview(img))
+        try:
+            return open_rgb(drive.preview(img))
+        except Exception:
+            return open_rgb(drive.download(img))  # big file with no Drive preview (e.g. TIFF)
     try:
         return open_rgb(drive.download(img))
     except Exception:
