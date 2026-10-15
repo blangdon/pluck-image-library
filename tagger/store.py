@@ -10,7 +10,12 @@ class Store:
     def __init__(self, url: str, service_key: str):
         self.url = url.rstrip("/")
         self.s = requests.Session()
-        self.s.headers.update({"apikey": service_key, "Authorization": f"Bearer {service_key}"})
+        if service_key.startswith("sb_"):
+            # New-style secret key (sb_secret_…): Supabase reads it from the apikey header alone.
+            self.s.headers.update({"apikey": service_key})
+        else:
+            # Legacy service_role JWT.
+            self.s.headers.update({"apikey": service_key, "Authorization": f"Bearer {service_key}"})
 
     def _check(self, r: requests.Response) -> requests.Response:
         if r.status_code >= 400:
