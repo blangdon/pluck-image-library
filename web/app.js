@@ -67,6 +67,10 @@
     if (t.includes("focus: pov food")) return "cooking";
     return "other";
   };
+  // Dedicated logo files: named or filed as logos, or SVG artwork.
+  const isLogo = (img) =>
+    /logo|wordmark|brandmark|lockup|favicon|\bdots?\b|monogram/i.test(`${img.folder_path || ""}/${img.name || ""}`) ||
+    img.mime_type === "image/svg+xml";
   const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
   // "New" = found since the last visit, and since the strip was last dismissed on this browser.
   const DISMISS_KEY = "pluck-new-dismissed-at";
@@ -226,13 +230,18 @@
       {
         id: "style", title: "Image style", mode: "all",
         options: [
-          ...STYLE_TAGS.slice(0, 3).filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
+          ...STYLE_TAGS.slice(0, 3).filter((t) => allTags.has(t)).map((t) => ({
+            key: t, label: label(t),
+            test: t === "text/graphic" ? (i) => has(t)(i) && !isLogo(i) : has(t),  // logos have their own option
+          })),
+          { key: "logo", label: "Pluck logo", test: isLogo },
           {
             // Renders and studio shots merged; only ones with an actual Pluck product (no 3D lions etc.).
             key: "render", label: "Render / product shot",
             // Flyers, ads and captioned images live only under Graphic / text.
             test: (i) => (i.is_render === true || effectiveTags(i).includes("product shot")) &&
-              PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)) && !effectiveTags(i).includes("text/graphic"),
+              PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)) && !effectiveTags(i).includes("text/graphic") &&
+              !isLogo(i),
           },
           ...STYLE_TAGS.slice(3).filter((t) => t !== "product shot" && allTags.has(t))
             .map((t) => ({ key: t, label: label(t), test: has(t) })),
