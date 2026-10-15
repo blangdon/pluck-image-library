@@ -9,7 +9,8 @@
   // How tags and fields are grouped in the sidebar. "any" groups match images with any ticked option;
   // "all" groups match images with every ticked option.
   const PRODUCT_TAGS = ["pluck shaker", "sachet"];
-  const STYLE_TAGS = ["product shot", "lifestyle", "flat lay", "text/graphic", "video still"];
+  // Image style, in the order shown (set once from library counts, most common first).
+  const STYLE_TAGS = ["lifestyle", "text/graphic", "flat lay", "video still", "product shot"];
   const LABELS = {
     "pluck shaker": "Shaker", sachet: "Sachet / pouch", "text/graphic": "Graphic / text",
     "boxes & retail": "Boxes & retail", "product shot": "Studio product shot",
@@ -176,15 +177,14 @@
       },
       {
         id: "people", title: "People", mode: "any",
-        note: "Found by face search. Remove a wrong match from the image with ×.",
         options: [...allPeople].sort().map((p) => ({ key: p, label: p, test: has(p) })),
       },
       {
-        id: "design", title: "Label design", mode: "any",
-        note: "Includes products whose label front can't be seen.",
+        id: "design", title: "Packaging (front only)", mode: "any",
+        note: "Based on the front of the shaker only.",
         options: ["current", "previous"].map((d) => ({
           key: d,
-          label: d === "current" ? "Current label" : "Previous label",
+          label: d === "current" ? "Current packaging" : "Old packaging",
           test: (i) => [d, "mixed", "unknown"].includes(designOf(i)),
           exTest: definite(d),
         })),
@@ -200,8 +200,9 @@
       {
         id: "style", title: "Image style", mode: "all",
         options: [
+          ...STYLE_TAGS.slice(0, 3).filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
           { key: "render", label: "Render / mockup", test: (i) => i.is_render === true },
-          ...STYLE_TAGS.filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
+          ...STYLE_TAGS.slice(3).filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
         ],
       },
     ];
