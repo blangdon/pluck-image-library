@@ -191,7 +191,8 @@
     }
     const HIDDEN = ["boxes & retail", "behind the scenes"];  // still tagged, just not offered as filters
     const shotTags = [...allTags].filter((t) =>
-      !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t));
+      !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t) &&
+      !t.startsWith("focus: "));  // video sorting labels, used only for the video groups
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
     const facets = [
       {
