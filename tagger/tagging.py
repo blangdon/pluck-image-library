@@ -146,8 +146,11 @@ class Tagger:
         design = raw.get("label_design") or raw.get("packaging")
         if design not in ("current", "previous", "mixed", "unknown"):
             design = None
-        if design is None and ("pluck shaker" in tags or "sachet" in tags):
+        has_product = "pluck shaker" in tags or "sachet" in tags
+        if design is None and has_product:
             design = "unknown"
+        if design == "unknown" and not has_product:
+            design = None  # no confident product in the shot, so there's no label to judge
         return {
             "description": (raw.get("description") or "").strip()[:500],
             "tags": tags,
