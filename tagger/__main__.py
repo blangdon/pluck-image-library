@@ -145,6 +145,10 @@ def main() -> None:
         ]
         print("\n".join(lines))
         print("::notice title=Video count::" + "%0A".join(lines), flush=True)
+        allf = Counter(v.folder_path.split("/", 1)[-1] for v in vids).most_common()
+        print("::notice title=Video folders::" + "%0A".join(f"{n}  {k}" for k, n in allf)[:60000], flush=True)
+        names = [f"{v.folder_path.split('/', 1)[-1]} :: {v.name}" for v in vids]
+        print("::notice title=Video names::" + "%0A".join(sorted(names))[:60000], flush=True)
         return
     images = list(drive.walk_images(folder_ids, kinds=("image/", "video/")))
     if args.count:  # Drive only: works before Supabase is set up
