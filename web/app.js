@@ -181,7 +181,6 @@
       },
       {
         id: "design", title: "Packaging (front only)", mode: "any",
-        note: "Based on the front of the shaker only.",
         options: ["current", "previous"].map((d) => ({
           key: d,
           label: d === "current" ? "Current packaging" : "Old packaging",
