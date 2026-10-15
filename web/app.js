@@ -15,7 +15,7 @@
   const PAGE = 120;
 
   const state = {
-    images: [],          // all rows, newest first
+    images: [],          // all rows, newest added to Drive first
     urls: new Map(),     // thumb_path -> signed url
     previousVisit: null, // Date or null
     tags: new Set(),
@@ -94,7 +94,7 @@
       const { data, error } = await sb
         .from("images").select(cols)
         .eq("removed", false).not("thumb_path", "is", null)
-        .order("first_seen_at", { ascending: false }).order("id")
+        .order("drive_created_at", { ascending: false, nullsFirst: false }).order("id")
         .range(from, from + 999);
       if (error) throw error;
       rows.push(...data);
