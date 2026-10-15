@@ -98,6 +98,7 @@ def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, att
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", action="store_true", help="count images only; no tagging or uploads")
+    ap.add_argument("--count-videos", action="store_true", help="count videos, sizes and lengths; nothing else")
     ap.add_argument("--compare", type=int, metavar="N", help="tag N random images with Sonnet and Haiku and compare")
     args = ap.parse_args()
 
@@ -107,6 +108,28 @@ def main() -> None:
 
     run_started = dt.datetime.now(dt.timezone.utc).isoformat()
     print(f"Reading Drive folders: {', '.join(drive.folder_name(f) for f in folder_ids)}")
+    if args.count_videos:
+        from collections import Counter
+
+        vids = list(drive.walk_images(folder_ids, kinds=("video/",)))
+        gb = sum(v.size for v in vids) / 1e9
+        mins = [v.duration_ms / 60000 for v in vids if v.duration_ms]
+        buckets = Counter(
+            "under 1 min" if m < 1 else "1-5 min" if m < 5 else "5-15 min" if m < 15 else "over 15 min" for m in mins
+        )
+        types = Counter(v.mime_type for v in vids)
+        folders = Counter(v.folder_path for v in vids).most_common(8)
+        lines = [
+            f"Videos: {len(vids)} ({gb:,.1f} GB), total length {sum(mins) / 60:,.1f} hours",
+            "Lengths: " + ", ".join(f"{k}: {buckets[k]}" for k in ["under 1 min", "1-5 min", "5-15 min", "over 15 min"])
+            + f", unknown: {len(vids) - len(mins)}",
+            "Types: " + ", ".join(f"{k} {n}" for k, n in types.most_common()),
+            "Biggest folders: " + "; ".join(f"{k} ({n})" for k, n in folders),
+            f"Largest file: {max((v.size for v in vids), default=0) / 1e9:,.2f} GB",
+        ]
+        print("\n".join(lines))
+        print("::notice title=Video count::" + "%0A".join(lines), flush=True)
+        return
     images = list(drive.walk_images(folder_ids))
     if args.count:  # Drive only: works before Supabase is set up
         total_mb = sum(i.size for i in images) / 1e6

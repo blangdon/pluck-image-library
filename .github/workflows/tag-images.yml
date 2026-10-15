@@ -8,7 +8,7 @@ on:
       mode:
         description: "tag = index and tag; count = just count images (free); compare = Sonnet vs Haiku on 50 images (under $1); faces = face search only; rematch = re-run people matching only"
         type: choice
-        options: [tag, count, compare, faces, rematch]
+        options: [tag, count, count-videos, compare, faces, rematch]
         default: tag
       limit:
         description: "Most images to tag in this run (blank = default 400)"
@@ -47,6 +47,8 @@ jobs:
         run: |
           if [ "${{ inputs.mode }}" = "faces" ] || [ "${{ inputs.mode }}" = "rematch" ]; then
             echo "Skipping AI tagging in ${{ inputs.mode }} mode."
+          elif [ "${{ inputs.mode }}" = "count-videos" ]; then
+            python -m tagger --count-videos
           elif [ "${{ inputs.mode }}" = "count" ]; then
             python -m tagger --count
           elif [ "${{ inputs.mode }}" = "compare" ]; then
@@ -55,7 +57,7 @@ jobs:
             python -m tagger
           fi
       - name: Find people (face search)
-        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'compare' }}
+        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' }}
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_IDS: ${{ secrets.DRIVE_FOLDER_IDS }}

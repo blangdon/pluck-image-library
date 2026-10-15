@@ -17,7 +17,8 @@ SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 FOLDER = "application/vnd.google-apps.folder"
 FIELDS = (
     "nextPageToken, files(id, name, mimeType, md5Checksum, size, createdTime, modifiedTime, "
-    "webViewLink, thumbnailLink, imageMediaMetadata(width, height), lastModifyingUser(displayName))"
+    "webViewLink, thumbnailLink, imageMediaMetadata(width, height), videoMediaMetadata(durationMillis, width, height), "
+    "lastModifyingUser(displayName))"
 )
 MAX_DOWNLOAD_BYTES = 40 * 1024 * 1024  # bigger files use Drive's own preview image instead
 
@@ -37,6 +38,7 @@ class DriveImage:
     width: int | None
     height: int | None
     added_by: str | None
+    duration_ms: int | None = None
 
 
 class Drive:
@@ -87,8 +89,8 @@ class Drive:
             if not token:
                 return
 
-    def walk_images(self, root_ids: list[str]) -> Iterator[DriveImage]:
-        """Every image under the given folders (recursively). Shortcuts are skipped."""
+    def walk_images(self, root_ids: list[str], kinds: tuple[str, ...] = ("image/",)) -> Iterator[DriveImage]:
+        """Every file of the given kinds under the given folders (recursively). Shortcuts are skipped."""
         seen_folders: set[str] = set()
         stack = [(fid, self.folder_name(fid)) for fid in root_ids]
         while stack:
@@ -100,8 +102,8 @@ class Drive:
                 mime = f.get("mimeType", "")
                 if mime == FOLDER:
                     stack.append((f["id"], f"{path}/{f['name']}"))
-                elif mime.startswith("image/"):
-                    meta = f.get("imageMediaMetadata") or {}
+                elif mime.startswith(kinds):
+                    meta = f.get("imageMediaMetadata") or f.get("videoMediaMetadata") or {}
                     yield DriveImage(
                         id=f["id"],
                         name=f["name"],
@@ -116,6 +118,7 @@ class Drive:
                         width=meta.get("width"),
                         height=meta.get("height"),
                         added_by=(f.get("lastModifyingUser") or {}).get("displayName"),
+                        duration_ms=int((f.get("videoMediaMetadata") or {}).get("durationMillis") or 0) or None,
                     )
 
     def download(self, img: DriveImage) -> bytes:
