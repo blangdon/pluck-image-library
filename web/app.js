@@ -227,8 +227,14 @@
         id: "style", title: "Image style", mode: "all",
         options: [
           ...STYLE_TAGS.slice(0, 3).filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
-          { key: "render", label: "Render / mockup", test: (i) => i.is_render === true },
-          ...STYLE_TAGS.slice(3).filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
+          {
+            // Renders and studio shots merged; only ones with an actual Pluck product (no 3D lions etc.).
+            key: "render", label: "Render / product shot",
+            test: (i) => (i.is_render === true || effectiveTags(i).includes("product shot")) &&
+              PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)),
+          },
+          ...STYLE_TAGS.slice(3).filter((t) => t !== "product shot" && allTags.has(t))
+            .map((t) => ({ key: t, label: label(t), test: has(t) })),
         ],
       },
     ];
