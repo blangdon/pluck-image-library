@@ -413,7 +413,13 @@
   function fillViewer() {
     const img = viewerList[state.viewerIndex];
     if (!img) return;
-    $("v-img").src = state.urls.get(img.thumb_path) || "";
+    const isVideo = mediaOf(img) === "video";
+    $("v-img").hidden = isVideo;
+    $("v-video").hidden = !isVideo;
+    // Drive's own player: plays for anyone signed in to Google with access to the Shared Drive.
+    const playUrl = isVideo ? `https://drive.google.com/file/d/${encodeURIComponent(img.id)}/preview` : "about:blank";
+    if ($("v-video").src !== playUrl) $("v-video").src = playUrl;
+    $("v-img").src = isVideo ? "" : state.urls.get(img.thumb_path) || "";
     $("v-img").alt = img.description || img.name;
     $("v-name").textContent = img.name;
     $("v-desc").textContent = img.description || "";
@@ -532,6 +538,7 @@
     }, { rootMargin: "800px" }).observe($("sentinel"));
 
     $("v-close").onclick = () => $("viewer").close();
+    $("viewer").addEventListener("close", () => { $("v-video").src = "about:blank"; });  // stop playback
     $("v-prev").onclick = () => step(-1);
     $("v-next").onclick = () => step(1);
     $("viewer").addEventListener("click", (e) => { if (e.target === $("viewer")) $("viewer").close(); });
