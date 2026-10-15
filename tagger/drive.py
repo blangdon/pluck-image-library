@@ -62,10 +62,10 @@ class Drive:
     def folder_name(self, folder_id: str) -> str:
         if folder_id.startswith("0A"):  # a Shared Drive: use its real name, not "Drive"
             try:
-                return self.api.drives().get(driveId=folder_id, fields="name").execute()["name"]
+                return self.api.drives().get(driveId=folder_id, fields="name").execute(num_retries=5)["name"]
             except Exception:
                 pass
-        meta = self.api.files().get(fileId=folder_id, fields="name", supportsAllDrives=True).execute()
+        meta = self.api.files().get(fileId=folder_id, fields="name", supportsAllDrives=True).execute(num_retries=5)
         return meta["name"]
 
     def _children(self, folder_id: str) -> Iterator[dict]:
@@ -82,7 +82,7 @@ class Drive:
                     includeItemsFromAllDrives=True,
                     corpora="allDrives",
                 )
-                .execute()
+                .execute(num_retries=5)
             )
             yield from resp.get("files", [])
             token = resp.get("nextPageToken")
