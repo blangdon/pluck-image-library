@@ -36,7 +36,7 @@ MAX_ATTEMPTS = 3
 
 
 def env(name: str, default: str | None = None) -> str:
-    value = os.environ.get(name, default)
+    value = (os.environ.get(name) or default or "").strip()  # pasted secrets often carry a stray newline
     if not value:
         print(f"::error title=Missing setting::{name}. Add it as a GitHub Actions secret (see README).")
         sys.exit(1)
