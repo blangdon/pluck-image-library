@@ -83,7 +83,10 @@ def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, att
                 "tag_attempts": 0,
             },
         )
-        return f"tagged  {img.folder_path}/{img.name}: {', '.join(result['tags']) or '(no tags)'}"
+        return (
+            f"tagged  {img.folder_path}/{img.name}: {', '.join(result['tags']) or '(no tags)'}"
+            f" | label: {result['packaging'] or 'no product'} | flavour: {', '.join(result['flavours']) or '-'}"
+        )
     except Exception as e:  # keep going; record the problem on the row
         store.update(img.id, {"tag_error": str(e)[:500], "tag_attempts": attempts + 1, "tagged_at": None})
         return f"FAILED  {img.folder_path}/{img.name}: {e}"
@@ -154,7 +157,7 @@ def main() -> None:
 
     config = yaml.safe_load((Path(__file__).parent / "config.yaml").read_text())
     tagger = Tagger(env("ANTHROPIC_API_KEY"), model, config)
-    started, failures = time.time(), 0
+    started, failures, lines = time.time(), 0, []
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = [
             pool.submit(
@@ -164,9 +167,20 @@ def main() -> None:
         ]
         for n, fut in enumerate(as_completed(futures), 1):
             line = fut.result()
+            lines.append(line)
             failures += line.startswith("FAILED")
             print(f"[{n}/{len(batch)}] {line}", flush=True)
 
+    from collections import Counter
+
+    labels = Counter(l.split("| label: ")[1].split(" |")[0] for l in lines if "| label: " in l)
+    flavours = Counter(f for l in lines if "| flavour: " in l for f in l.split("| flavour: ")[1].split(", ") if f != "-")
+    print(
+        "::notice title=Batch summary::"
+        + f"Label design: {dict(labels)}%0AFlavours: {dict(flavours)}%0AExamples:%0A"
+        + "%0A".join(l[:220] for l in lines[:25]),
+        flush=True,
+    )
     left = len(todo) - len(batch)
     print(
         f"Done in {time.time() - started:,.0f}s: {len(batch) - failures} tagged, {failures} failed"
