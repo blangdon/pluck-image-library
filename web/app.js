@@ -230,8 +230,9 @@
           {
             // Renders and studio shots merged; only ones with an actual Pluck product (no 3D lions etc.).
             key: "render", label: "Render / product shot",
+            // Flyers, ads and captioned images live only under Graphic / text.
             test: (i) => (i.is_render === true || effectiveTags(i).includes("product shot")) &&
-              PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)),
+              PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)) && !effectiveTags(i).includes("text/graphic"),
           },
           ...STYLE_TAGS.slice(3).filter((t) => t !== "product shot" && allTags.has(t))
             .map((t) => ({ key: t, label: label(t), test: has(t) })),
