@@ -72,6 +72,19 @@ Nothing is ever written to Drive. The tagger has read-only access.
 - **Better shaker recognition:** add clear photos to `tagger/reference/` and list them under `reference_images` in `config.yaml`.
 - **Failures** are retried up to 3 times. The reason is saved in the `tag_error` column. Formats Pillow can't read (RAW, PSD) fall back to Drive's own preview.
 
+## Finding people (face search)
+
+Optional. Uses Amazon Rekognition to label images with named people, e.g. "James".
+
+1. AWS account → **IAM** → create user `pluck-faces` with the `AmazonRekognitionFullAccess` policy → **Create access key** (application running outside AWS).
+2. GitHub secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Optional variable `AWS_REGION` (default `ap-southeast-2`, Sydney).
+3. Put 2–4 clear photos of the person in `tagger/people/` (they should be the largest face in each) and list them under `people` in `tagger/config.yaml`.
+4. Run the workflow in **faces** mode. After that, each hourly run scans only new images.
+
+Each image is scanned once (about US$0.001, and the first 1,000 a month are free for an AWS account's first year). Matching only runs when there are new images or new reference photos. Faces are stored in a private Rekognition collection in your AWS account; get the agreement of anyone you add.
+
+To add a person later: add their photos and a `people` entry, then run **rematch** mode (no rescanning needed).
+
 ## Local preview
 
 Open `web/index.html` through any static server, without `config.js`, and it runs in demo mode if `web/demo-data.js` exists.

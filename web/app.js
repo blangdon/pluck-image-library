@@ -44,7 +44,7 @@
   const effectiveTags = (img) => {
     const hidden = new Set(img.hidden_tags || []);
     const out = [];
-    for (const raw of [...(img.tags || []), ...(img.manual_tags || [])]) {
+    for (const raw of [...(img.people || []), ...(img.tags || []), ...(img.manual_tags || [])]) {
       const t = TAG_RENAMES[raw] || raw;
       if (!hidden.has(raw) && !hidden.has(t) && !out.includes(t)) out.push(t);
     }
@@ -99,8 +99,8 @@
   }
 
   async function loadImages() {
-    const cols =
-      "id,name,folder_path,mime_type,drive_url,drive_created_at,first_seen_at,description,tags,manual_tags,hidden_tags,flavours,packaging,is_render,thumb_path";
+    let cols =
+      "id,name,folder_path,mime_type,drive_url,drive_created_at,first_seen_at,description,tags,manual_tags,hidden_tags,flavours,packaging,is_render,thumb_path,people";
     const rows = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb
@@ -108,6 +108,11 @@
         .eq("removed", false).not("thumb_path", "is", null)
         .order("drive_created_at", { ascending: false, nullsFirst: false }).order("id")
         .range(from, from + 999);
+      if (error && cols.endsWith(",people") && /people/.test(error.message || "")) {
+        cols = cols.replace(",people", "");  // face search columns not added yet
+        from -= 1000;
+        continue;
+      }
       if (error) throw error;
       rows.push(...data);
       if (data.length < 1000) return rows;
@@ -151,11 +156,13 @@
     const has = (t) => (img) => effectiveTags(img).includes(t);
     const allTags = new Set();
     const allFlavours = new Set();
+    const allPeople = new Set();
     for (const i of state.images) {
+      for (const p of i.people || []) allPeople.add(p);
       for (const t of effectiveTags(i)) allTags.add(t);
       for (const f of flavoursOf(i)) allFlavours.add(f);
     }
-    const shotTags = [...allTags].filter((t) => !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t));
+    const shotTags = [...allTags].filter((t) => !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t));
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
     const facets = [
       {
@@ -164,6 +171,11 @@
           ...PRODUCT_TAGS.map((t) => ({ key: t, label: label(t), test: has(t) })),
           { key: "none", label: "No Pluck product", test: (i) => !PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)) },
         ],
+      },
+      {
+        id: "people", title: "People", mode: "any",
+        note: "Found by face search. Remove a wrong match from the image with ×.",
+        options: [...allPeople].sort().map((p) => ({ key: p, label: p, test: has(p) })),
       },
       {
         id: "design", title: "Label design", mode: "any",
@@ -429,7 +441,7 @@
 
   function removeTag(img, tag) {
     const manual = (img.manual_tags || []).filter((t) => t !== tag);
-    const hidden = (img.tags || []).includes(tag)
+    const hidden = [...(img.tags || []), ...(img.people || [])].includes(tag)
       ? [...new Set([...(img.hidden_tags || []), tag])]
       : img.hidden_tags || [];
     saveTags(img, manual, hidden);
@@ -439,7 +451,8 @@
     const tag = raw.trim().toLowerCase();
     if (!tag || effectiveTags(img).includes(tag)) return;
     const hidden = (img.hidden_tags || []).filter((t) => t !== tag);
-    const manual = (img.tags || []).includes(tag) ? img.manual_tags || [] : [...(img.manual_tags || []), tag];
+    const manual = [...(img.tags || []), ...(img.people || [])].includes(tag)
+      ? img.manual_tags || [] : [...(img.manual_tags || []), tag];
     saveTags(img, manual, hidden);
   }
 

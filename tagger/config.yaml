@@ -73,3 +73,12 @@ reference_images:
   - file: pouch-allpurpose-previous.jpg
     caption: >-
       PREVIOUS label design: the All-Purpose pouch with an illustrated bull and no circle.
+
+# People found by face search (Amazon Rekognition, see tagger/faces.py). Each person needs a few clear
+# photos where they are the largest face. Add or change photos, then run the workflow in "faces" mode.
+people:
+  - name: James
+    photos:
+      - people/james-1.jpg
+      - people/james-2.jpg
+      - people/james-3.jpg

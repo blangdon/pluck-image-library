@@ -62,10 +62,18 @@ create table if not exists images (
   manual_tags      text[] not null default '{}',
   hidden_tags      text[] not null default '{}',
 
+  -- Face search (tagger/faces.py)
+  people           text[] not null default '{}',  -- names matched by face search
+  faces_md5        text,                          -- version of the file last scanned for faces
+
   first_seen_at    timestamptz not null default now(),  -- when the indexer first found it
   last_seen_at     timestamptz not null default now(),  -- last time the indexer saw it in Drive
   removed          boolean not null default false       -- no longer in the covered folders
 );
+
+-- Columns added after the first release (safe to re-run).
+alter table images add column if not exists people text[] not null default '{}';
+alter table images add column if not exists faces_md5 text;
 
 create index if not exists images_first_seen_idx on images (first_seen_at desc);
 create index if not exists images_tags_idx on images using gin (tags);
