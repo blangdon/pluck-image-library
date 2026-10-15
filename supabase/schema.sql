@@ -13,6 +13,11 @@ create table if not exists allowed_domains (
   domain text primary key           -- lower-case, without @, e.g. 'pluck.co.nz'
 );
 
+-- Locked: no policies, so only the dashboard (and the function below) can read or change the lists.
+alter table allowed_emails enable row level security;
+alter table allowed_domains enable row level security;
+revoke all on allowed_emails, allowed_domains from anon, authenticated;
+
 create or replace function is_allowed() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
