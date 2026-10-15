@@ -87,6 +87,12 @@ class Tagger:
         return blocks
 
     def tag(self, jpeg: bytes) -> dict:
+        try:
+            return self._tag_once(jpeg)
+        except RuntimeError:
+            return self._tag_once(jpeg)  # an occasional empty answer usually works second time
+
+    def _tag_once(self, jpeg: bytes) -> dict:
         content = [
             *self.reference_blocks,
             {"type": "text", "text": "Image to tag:"},
@@ -112,7 +118,7 @@ class Tagger:
             text = "".join(getattr(b, "text", "") for b in msg.content)
             start, end = text.find("{"), text.rfind("}")
             if start == -1 or end <= start:
-                raise RuntimeError(f"Model didn't return tags: {text[:200]}")
+                raise RuntimeError(f"Model didn't return tags (stop reason: {msg.stop_reason}): {text[:200]}")
             result = json.loads(text[start : end + 1])
         return self.clean(result)
 

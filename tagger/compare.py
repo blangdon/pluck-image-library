@@ -103,6 +103,7 @@ def run(drive, images, n: int, api_key: str, fetch_pixels) -> None:
 
     summary = "\n".join(lines)
     print(summary)
+    print("::notice title=Comparison result::" + summary.replace("\n", "%0A"), flush=True)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
             f.write(summary + "\n")
