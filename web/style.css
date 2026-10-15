@@ -91,7 +91,7 @@ button, input { font: inherit; color: inherit; }
 
 /* New strip */
 .layout {
-  display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 28px; align-items: start;
+  display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 28px; align-items: start;
   padding-block: 20px 48px;
 }
 .content { display: grid; gap: 20px; min-width: 0; }
@@ -132,7 +132,7 @@ button, input { font: inherit; color: inherit; }
 .check label { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
 .check input { flex: none; margin: 0; width: 16px; height: 16px; accent-color: var(--teal); cursor: pointer; }
 .check .label { min-width: 0; overflow-wrap: anywhere; }
-.check .n { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.check .n { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; min-width: 4ch; }
 .check.zero { opacity: .45; }
 .check.zero label, .check.zero input { cursor: default; }
 .check.included .label { font-weight: 600; }

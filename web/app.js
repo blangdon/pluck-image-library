@@ -162,7 +162,9 @@
       for (const t of effectiveTags(i)) allTags.add(t);
       for (const f of flavoursOf(i)) allFlavours.add(f);
     }
-    const shotTags = [...allTags].filter((t) => !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t));
+    const HIDDEN = ["boxes & retail", "behind the scenes"];  // still tagged, just not offered as filters
+    const shotTags = [...allTags].filter((t) =>
+      !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t));
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
     const facets = [
       {
@@ -182,7 +184,7 @@
         note: "Includes products whose label front can't be seen.",
         options: ["current", "previous"].map((d) => ({
           key: d,
-          label: d === "current" ? "Current (cow in a circle)" : "Previous (no circle)",
+          label: d === "current" ? "Current label" : "Previous label",
           test: (i) => [d, "mixed", "unknown"].includes(designOf(i)),
           exTest: definite(d),
         })),
@@ -198,7 +200,6 @@
       {
         id: "style", title: "Image style", mode: "all",
         options: [
-          { key: "photo", label: "Real photo", test: (i) => i.is_render === false },
           { key: "render", label: "Render / mockup", test: (i) => i.is_render === true },
           ...STYLE_TAGS.filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
         ],
@@ -255,8 +256,8 @@
         no.onclick = () => { selected.delete(key); excluded.add(key); refresh(); };
         return el("div", { className: "check" + (zero ? " zero" : "") + (out ? " excluded" : "") + (on ? " included" : "") },
           el("label", {}, box, el("span", { className: "label", textContent: label })),
-          el("span", { className: "n", textContent: out ? "excluded" : count }),
-          out ? null : no);
+          out ? null : no,
+          el("span", { className: "n", textContent: out ? "excluded" : count }));
       })
     );
   }
