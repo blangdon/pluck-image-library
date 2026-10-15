@@ -92,7 +92,9 @@ def run(drive, images, n: int, api_key: str, fetch_pixels) -> None:
     if len(rows) > len(ok):
         from collections import Counter
 
-        reasons = Counter(r[3][:300] for r in rows if r[3])
+        import re
+
+        reasons = Counter(re.sub(r"req_\w+", "req_…", r[3])[:300] for r in rows if r[3])
         lines += ["", f"{len(rows) - len(ok)} images failed. Reasons:", ""]
         for reason, n in reasons.most_common(5):
             lines.append(f"- {n}× `{reason}`")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import threading
 from pathlib import Path
 
@@ -25,7 +26,8 @@ INSTRUCTIONS = """Tag the image above. Rules:
 - Read flavour names off any visible Pluck label. Leave flavours empty if none can be read.
 - packaging: which Pluck label generation is shown ("new", "old", "mixed"), or "none" if no Pluck product.
 - is_render: true for 3D renders and mockups, false for real photos.
-- description: one plain sentence describing the image, as a person would search for it."""
+- description: one plain sentence describing the image, as a person would search for it.
+Answer only by calling the record_tags tool."""
 
 
 class Tagger:
@@ -96,7 +98,7 @@ class Tagger:
             max_tokens=1000,
             system=SYSTEM,
             tools=[self.tool],
-            tool_choice={"type": "tool", "name": "record_tags"},
+            tool_choice={"type": "auto"},  # newer models don't accept a forced tool; the prompt asks for it
             messages=[{"role": "user", "content": content}],
         )
         with self._lock:
@@ -105,7 +107,13 @@ class Tagger:
             self.usage["cache_read"] += getattr(u, "cache_read_input_tokens", 0) or 0
             self.usage["cache_write"] += getattr(u, "cache_creation_input_tokens", 0) or 0
             self.usage["output"] += u.output_tokens
-        result = next(b.input for b in msg.content if b.type == "tool_use")
+        result = next((b.input for b in msg.content if b.type == "tool_use"), None)
+        if result is None:  # fall back to JSON written as text
+            text = "".join(getattr(b, "text", "") for b in msg.content)
+            start, end = text.find("{"), text.rfind("}")
+            if start == -1 or end <= start:
+                raise RuntimeError(f"Model didn't return tags: {text[:200]}")
+            result = json.loads(text[start : end + 1])
         return self.clean(result)
 
     def clean(self, raw: dict) -> dict:
