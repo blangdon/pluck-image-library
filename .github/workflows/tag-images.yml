@@ -10,6 +10,10 @@ on:
         type: choice
         options: [tag, count, compare]
         default: tag
+      limit:
+        description: "Most images to tag in this run (blank = default 400)"
+        required: false
+        default: ""
       retag_all:
         description: "Re-tag every image (only after changing tagger/config.yaml)"
         type: boolean
@@ -22,7 +26,7 @@ concurrency:
 jobs:
   tag:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,7 +42,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TAG_MODEL: ${{ vars.TAG_MODEL }}
-          MAX_IMAGES_PER_RUN: ${{ vars.MAX_IMAGES_PER_RUN }}
+          MAX_IMAGES_PER_RUN: ${{ inputs.limit || vars.MAX_IMAGES_PER_RUN }}
           RETAG_ALL: ${{ inputs.retag_all }}
         run: |
           if [ "${{ inputs.mode }}" = "count" ]; then

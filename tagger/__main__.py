@@ -43,11 +43,13 @@ def env(name: str, default: str | None = None) -> str:
     return value
 
 
-def needs_tagging(img: DriveImage, row: dict | None, retag_all: bool) -> bool:
+def needs_tagging(img: DriveImage, row: dict | None, retag_all: bool, version: int = 1) -> bool:
     if row is None:
         return True  # never seen before
     if retag_all or (img.md5 and row.get("md5") and img.md5 != row["md5"]):
         return True  # asked to re-tag, or the file's content changed
+    if row.get("tagged_at") and not str(row.get("tag_model") or "").endswith(f"|v{version}"):
+        return True  # tagged under older rules (config.yaml version changed)
     if row.get("tagged_at") is None:
         return (row.get("tag_attempts") or 0) < MAX_ATTEMPTS  # earlier attempts failed
     return False
@@ -62,7 +64,7 @@ def fetch_pixels(drive: Drive, img: DriveImage):
         return open_rgb(drive.preview(img))  # RAW, PSD, SVG and other formats Pillow can't read
 
 
-def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, attempts: int) -> str:
+def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, attempts: int, version: int) -> str:
     try:
         pixels = fetch_pixels(drive, img)
         thumb_path = f"{img.id}-{(img.md5 or 'x')[:8]}.jpg"
@@ -76,7 +78,7 @@ def process(img: DriveImage, drive: Drive, store: Store, tagger, model: str, att
                 "width": img.width or pixels.width,
                 "height": img.height or pixels.height,
                 "tagged_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-                "tag_model": model,
+                "tag_model": f"{model}|v{version}",
                 "tag_error": None,
                 "tag_attempts": 0,
             },
@@ -113,7 +115,8 @@ def main() -> None:
 
     store = Store(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"))
     known = store.existing()
-    todo = [img for img in images if needs_tagging(img, known.get(img.id), retag_all)]
+    version = int(yaml.safe_load((Path(__file__).parent / "config.yaml").read_text()).get("version") or 1)
+    todo = [img for img in images if needs_tagging(img, known.get(img.id), retag_all, version)]
     total_mb = sum(i.size for i in images) / 1e6
     print(f"Found {len(images)} images ({total_mb:,.0f} MB). New or changed, needing tags: {len(todo)}.")
 
@@ -154,7 +157,9 @@ def main() -> None:
     started, failures = time.time(), 0
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = [
-            pool.submit(process, img, drive, store, tagger, model, (known.get(img.id) or {}).get("tag_attempts") or 0)
+            pool.submit(
+                process, img, drive, store, tagger, model, (known.get(img.id) or {}).get("tag_attempts") or 0, version
+            )
             for img in batch
         ]
         for n, fut in enumerate(as_completed(futures), 1):

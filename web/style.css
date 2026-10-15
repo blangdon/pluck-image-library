@@ -115,7 +115,10 @@ button, input { font: inherit; color: inherit; }
 .media-toggle button[aria-pressed="true"] { background: var(--teal); color: var(--bg); box-shadow: var(--shadow); }
 .media-toggle .n { font-family: var(--mono); font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; }
 .search-hint { margin: -10px 0 0; padding-left: 4px; }
+.facets { display: flex; flex-direction: column; gap: 18px; }
 .facet { display: grid; gap: 6px; }
+.facet-mode { float: right; text-transform: none; letter-spacing: 0; font-family: var(--body); font-size: 11px; opacity: .8; }
+.facet-note { margin: -2px 0 2px; padding-inline: 6px; }
 .facet-title {
   margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line);
   font-family: var(--mono); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted);

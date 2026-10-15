@@ -1,56 +1,75 @@
-# What the tagger looks for. Edit freely: new tags apply to images tagged
-# after the change. To re-tag everything with a new list, see README ("Re-tag").
+# What the tagger looks for. Edit freely, then bump `version` to re-tag every
+# image with the new rules (each hourly run continues until all are done).
+version: 2
 
 tags:
+  # Pluck product
   - name: pluck shaker
-    hint: A Pluck seasoning shaker, the cylindrical can with a shaker lid. Any flavour, old or new label design, render or real photo, even if small or partly hidden.
+    hint: A Pluck seasoning shaker, the cylindrical can with a shaker lid. Any flavour or label design, render or real photo, even if small or partly hidden.
   - name: sachet
-    hint: A Pluck stand-up pouch or sachet (flexible bag), any flavour or design.
+    hint: A Pluck stand-up pouch, bag or sachet (flexible packet), any flavour or label design.
+  # In the shot
   - name: food
     hint: Food or a prepared dish is visible.
   - name: people
     hint: A person or part of one (hands count) is visible.
-  - name: packaging
-    hint: Shipping boxes, retail displays, cases or bulk packaging, rather than a single product.
-  - name: lifestyle
-    hint: A real-world scene (kitchen, table, outdoors) rather than a plain studio background.
-  - name: product shot
-    hint: The product is the subject, usually on a plain or studio background.
-  - name: flat lay
-    hint: Shot from directly above with items arranged on a surface.
   - name: event
     hint: A market stall, trade show, tasting, talk or other event.
   - name: behind the scenes
     hint: Production, warehouse, office, photoshoot setup or team at work.
+  - name: boxes & retail
+    hint: Shipping boxes, cartons, cases, retail shelves or displays, rather than a single product.
+  # Image style
+  - name: product shot
+    hint: The product is the subject, usually on a plain or studio background.
+  - name: lifestyle
+    hint: A real-world scene (kitchen, table, outdoors) rather than a plain studio background.
+  - name: flat lay
+    hint: Shot from directly above with items arranged on a surface.
   - name: text/graphic
     hint: A designed graphic, ad, social tile or image with added text, badges or logos overlaid.
   - name: video still
     hint: A screenshot from a video, e.g. a play button or video player chrome is visible.
 
-# Known flavours. The tagger reads flavour names off labels; anything it reads
-# that matches one of these (ignoring case) is stored with this exact spelling.
+# Pluck's product names. Labels the model reads are matched to these, ignoring case.
 flavours:
   - Original
   - All-Purpose
+  - Zesty Garlic
+  - Southwest
+  - Chimichurri
+  - Habanero Lime
   - Lion Salt
   - Cinnabrain
-  - Zesty Garlic
-  - Habanero Lime
-  - Southwest
-  - Pure Brain
   - Pure Organs
-  - Cinnamon
+  - Pure Brain
+
+# Other spellings or short forms the model may read, and the product they mean.
+flavour_aliases:
+  pure: Pure Organs
+  pure organ: Pure Organs
+  pure organs powder: Pure Organs
+  cinna brain: Cinnabrain
+  all purpose: All-Purpose
+  habanero: Habanero Lime
+  zesty: Zesty Garlic
+  garlic: Zesty Garlic
 
 # Reference photos the model sees before every image (in tagger/reference/).
 # Prompt caching keeps the cost of these low.
 reference_images:
-  - file: shaker-lion-salt-new.png
-    caption: Pluck shaker, current label design (Lion Salt). The shaker is a cylindrical can with a perforated shaker lid.
-  - file: shaker-zesty-garlic-new.jpg
-    caption: Pluck shaker, current label design (Zesty Garlic).
+  - file: current-design-sheet.jpg
+    caption: >-
+      CURRENT label design, shown on shakers and pouches across the range. The tell-tale sign is the
+      cow standing inside a solid circle on the front. Colours vary by flavour and do NOT matter.
   - file: shaker-zesty-garlic-old-in-use.jpg
-    caption: The dark green can in this photo is a Pluck shaker in the older label design (Zesty Garlic). The food is not part of the reference.
-  - file: pouch-original-new.png
-    caption: Pluck stand-up pouch (sachet), current label design (Original).
+    caption: >-
+      PREVIOUS label design: the dark green Zesty Garlic shaker on the bench has no circle behind a cow
+      on its front. Ignore the food; it is not part of the reference.
   - file: pouch-original-old-in-use.jpg
-    caption: The orange bag being held is a Pluck pouch (sachet) in the older design with the illustrated bull (Original). The food is not part of the reference.
+    caption: >-
+      PREVIOUS label design: the orange Original pouch with an illustrated bull and no circle.
+      Ignore the food; it is not part of the reference.
+  - file: pouch-allpurpose-previous.jpg
+    caption: >-
+      PREVIOUS label design: the All-Purpose pouch with an illustrated bull and no circle.

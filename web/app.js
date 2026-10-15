@@ -6,22 +6,29 @@
   const demo = !cfg || new URLSearchParams(location.search).has("demo");
   const $ = (id) => document.getElementById(id);
 
-  const TYPE_FILTERS = [
-    { id: "photo", label: "Real photos", test: (i) => i.is_render === false },
-    { id: "render", label: "Renders & mockups", test: (i) => i.is_render === true },
-    { id: "new-pack", label: "New packaging", test: (i) => i.packaging === "new" || i.packaging === "mixed" },
-    { id: "old-pack", label: "Old packaging", test: (i) => i.packaging === "old" || i.packaging === "mixed" },
-  ];
+  // How tags and fields are grouped in the sidebar. "any" groups match images with any ticked option;
+  // "all" groups match images with every ticked option.
+  const PRODUCT_TAGS = ["pluck shaker", "sachet"];
+  const STYLE_TAGS = ["product shot", "lifestyle", "flat lay", "text/graphic", "video still"];
+  const LABELS = {
+    "pluck shaker": "Shaker", sachet: "Sachet / pouch", "text/graphic": "Graphic / text",
+    "boxes & retail": "Boxes & retail", "product shot": "Studio product shot",
+  };
+  const TAG_RENAMES = { packaging: "boxes & retail" };              // older tag names
+  const FLAVOUR_ALIASES = { pure: "Pure Organs", "pure organ": "Pure Organs" };
+  const DESIGN_NAMES = { new: "current", old: "previous" };         // older label-design values
+  const DESIGN_TEXT = {
+    current: "current label", previous: "previous label", mixed: "current and previous labels",
+    unknown: "label design can't be seen",
+  };
   const PAGE = 120;
 
   const state = {
     images: [],          // all rows, newest added to Drive first
     urls: new Map(),     // thumb_path -> signed url
     previousVisit: null, // Date or null
-    tags: new Set(),
-    flavours: new Set(),
-    types: new Set(),
-    exclude: { tags: new Set(), flavours: new Set(), types: new Set() },
+    include: {},         // facet id -> Set of ticked option keys
+    exclude: {},         // facet id -> Set of excluded option keys
     newOnly: false,
     media: "image",      // "image" or "video"
     draft: "",           // what's being typed in the search box right now
@@ -37,11 +44,15 @@
   const effectiveTags = (img) => {
     const hidden = new Set(img.hidden_tags || []);
     const out = [];
-    for (const t of [...(img.tags || []), ...(img.manual_tags || [])]) {
-      if (!hidden.has(t) && !out.includes(t)) out.push(t);
+    for (const raw of [...(img.tags || []), ...(img.manual_tags || [])]) {
+      const t = TAG_RENAMES[raw] || raw;
+      if (!hidden.has(raw) && !hidden.has(t) && !out.includes(t)) out.push(t);
     }
     return out;
   };
+  const flavoursOf = (img) => [...new Set((img.flavours || []).map((f) => FLAVOUR_ALIASES[f.toLowerCase()] || f))];
+  const designOf = (img) => DESIGN_NAMES[img.packaging] || img.packaging || "none";
+  const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
   const isNew = (img) => state.previousVisit && new Date(img.first_seen_at) > state.previousVisit;
   const fmtDate = (s) =>
     s ? new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Unknown";
@@ -134,27 +145,78 @@
   // ---------------------------------------------------------------- filtering
   const mediaOf = (img) => ((img.mime_type || "").startsWith("video/") ? "video" : "image");
 
+  // Builds the sidebar groups from what's in the library. Each option has test(img) for ticking and,
+  // where different, exTest(img) for excluding.
+  function buildFacets() {
+    const has = (t) => (img) => effectiveTags(img).includes(t);
+    const allTags = new Set();
+    const allFlavours = new Set();
+    for (const i of state.images) {
+      for (const t of effectiveTags(i)) allTags.add(t);
+      for (const f of flavoursOf(i)) allFlavours.add(f);
+    }
+    const shotTags = [...allTags].filter((t) => !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t));
+    const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
+    const facets = [
+      {
+        id: "product", title: "Pluck product", mode: "any",
+        options: [
+          ...PRODUCT_TAGS.map((t) => ({ key: t, label: label(t), test: has(t) })),
+          { key: "none", label: "No Pluck product", test: (i) => !PRODUCT_TAGS.some((t) => effectiveTags(i).includes(t)) },
+        ],
+      },
+      {
+        id: "design", title: "Label design", mode: "any",
+        note: "Includes products whose label front can't be seen.",
+        options: ["current", "previous"].map((d) => ({
+          key: d,
+          label: d === "current" ? "Current (cow in a circle)" : "Previous (no circle)",
+          test: (i) => [d, "mixed", "unknown"].includes(designOf(i)),
+          exTest: definite(d),
+        })),
+      },
+      {
+        id: "flavour", title: "Flavour", mode: "any",
+        options: [...allFlavours].sort().map((f) => ({ key: f, label: f, test: (i) => flavoursOf(i).includes(f) })),
+      },
+      {
+        id: "shot", title: "In the shot", mode: "all", sortByCount: true,
+        options: shotTags.map((t) => ({ key: t, label: label(t), test: has(t) })),
+      },
+      {
+        id: "style", title: "Image style", mode: "all",
+        options: [
+          { key: "photo", label: "Real photo", test: (i) => i.is_render === false },
+          { key: "render", label: "Render / mockup", test: (i) => i.is_render === true },
+          ...STYLE_TAGS.filter((t) => allTags.has(t)).map((t) => ({ key: t, label: label(t), test: has(t) })),
+        ],
+      },
+    ];
+    for (const f of facets) {
+      f.byKey = new Map(f.options.map((o) => [o.key, o]));
+      state.include[f.id] ||= new Set();
+      state.exclude[f.id] ||= new Set();
+    }
+    state.facets = facets;
+  }
+
   function matches(img, skip) {
     if (mediaOf(img) !== state.media) return false;
     if (state.newOnly && !isNew(img)) return false;
-    const ex = state.exclude;
-    if (skip !== "tags") {
-      const t = effectiveTags(img);
-      for (const want of state.tags) if (!t.includes(want)) return false;
-      for (const no of ex.tags) if (t.includes(no)) return false;
-    }
-    if (skip !== "flavours") {
-      const f = img.flavours || [];
-      if (state.flavours.size && !f.some((x) => state.flavours.has(x))) return false;
-      if (f.some((x) => ex.flavours.has(x))) return false;
-    }
-    if (skip !== "types") {
-      for (const id of state.types) if (!TYPE_FILTERS.find((f) => f.id === id).test(img)) return false;
-      for (const id of ex.types) if (TYPE_FILTERS.find((f) => f.id === id).test(img)) return false;
+    for (const f of state.facets) {
+      const inc = state.include[f.id];
+      if (f.id !== skip && inc.size) {
+        const hits = [...inc].map((k) => f.byKey.get(k)).filter(Boolean).map((o) => o.test(img));
+        if (hits.length && (f.mode === "any" ? !hits.some(Boolean) : !hits.every(Boolean))) return false;
+      }
+      for (const k of state.exclude[f.id]) {
+        const o = f.byKey.get(k);
+        if (o && (o.exTest || o.test)(img)) return false;
+      }
     }
     const terms = [...state.searches.filter((q) => q.on).map((q) => q.text), state.draft].filter(Boolean);
     if (terms.length) {
-      const hay = [img.name, img.description, img.folder_path, ...effectiveTags(img), ...(img.flavours || [])]
+      const hay = [img.name, img.description, img.folder_path, ...effectiveTags(img).map(label), ...flavoursOf(img)]
         .join(" ").toLowerCase();
       for (const term of terms) for (const word of term.split(/\s+/)) if (word && !hay.includes(word)) return false;
     }
@@ -162,13 +224,13 @@
   }
 
   // A row is off, included (ticked) or excluded (dash, red, crossed out).
-  function renderChecks(containerId, items, selected, excluded) {
-    $(containerId).replaceChildren(
+  function renderChecks(container, items, selected, excluded) {
+    container.replaceChildren(
       ...items.map(({ key, label, count }) => {
         const on = selected.has(key);
         const out = excluded.has(key);
         const zero = !on && !out && count === 0;
-        const box = el("input", { type: "checkbox", checked: on, disabled: zero });
+        const box = el("input", { type: "checkbox", checked: on || out, disabled: zero });
         box.indeterminate = out;
         box.setAttribute("aria-label", out ? `${label}: excluded. Click to stop excluding` : label);
         box.onchange = () => {
@@ -209,28 +271,27 @@
   function refresh() {
     state.shown = state.images.filter((i) => matches(i));
 
-    // Tag chips: counts within the current result (tags combine with AND).
-    const tagCounts = new Map();
-    for (const i of state.images) for (const t of effectiveTags(i)) tagCounts.set(t, 0);
-    for (const i of state.shown) for (const t of effectiveTags(i)) tagCounts.set(t, tagCounts.get(t) + 1);
-    const tagItems = [...tagCounts.keys()]
-      .sort((a, b) => {
-        const pinned = (t) => (state.tags.has(t) || state.exclude.tags.has(t) ? 1 : 0);
-        return pinned(b) - pinned(a) || tagCounts.get(b) - tagCounts.get(a) || a.localeCompare(b);
-      })
-      .map((t) => ({ key: t, label: t, count: tagCounts.get(t) }));
-    renderChecks("tag-chips", tagItems, state.tags, state.exclude.tags);
-
-    // Flavour chips combine with OR, so count against everything but the flavour filter.
-    const base = state.images.filter((i) => matches(i, "flavours"));
-    const flav = new Map();
-    for (const i of state.images) for (const f of i.flavours || []) flav.set(f, 0);
-    for (const i of base) for (const f of i.flavours || []) flav.set(f, flav.get(f) + 1);
-    const flavItems = [...flav.keys()].sort().map((f) => ({ key: f, label: f, count: flav.get(f) }));
-    renderChecks("flavour-chips", flavItems, state.flavours, state.exclude.flavours);
-
-    const typeItems = TYPE_FILTERS.map((f) => ({ key: f.id, label: f.label, count: state.shown.filter(f.test).length }));
-    renderChecks("type-chips", typeItems, state.types, state.exclude.types);
+    // Sidebar groups. "any" groups count against everything except their own ticks; "all" groups
+    // count within the current result.
+    const sections = [];
+    for (const f of state.facets) {
+      const inc = state.include[f.id], exc = state.exclude[f.id];
+      const base = f.mode === "any" ? state.images.filter((i) => matches(i, f.id)) : state.shown;
+      let items = f.options.map((o) => ({ key: o.key, label: o.label, count: base.filter(o.test).length }));
+      if (f.sortByCount) {
+        const pinned = (k) => (inc.has(k) || exc.has(k) ? 1 : 0);
+        items.sort((a, b) => pinned(b.key) - pinned(a.key) || b.count - a.count || a.label.localeCompare(b.label));
+      }
+      if (!items.length) continue;
+      const list = el("div", { className: "checks" });
+      renderChecks(list, items, inc, exc);
+      sections.push(el("section", { className: "facet" },
+        el("h2", { className: "facet-title" }, f.title,
+          el("span", { className: "facet-mode", textContent: f.mode === "any" ? "any of" : "all of" })),
+        f.note ? el("p", { className: "hint facet-note", textContent: f.note }) : null,
+        list));
+    }
+    $("facets").replaceChildren(...sections);
 
     renderSearches();
     const nImages = state.images.filter((i) => mediaOf(i) === "image").length;
@@ -239,8 +300,8 @@
     $("media-image").setAttribute("aria-pressed", state.media === "image");
     $("media-video").setAttribute("aria-pressed", state.media === "video");
     const total = state.media === "image" ? nImages : state.images.length - nImages;
-    const active = state.tags.size + state.flavours.size + state.types.size +
-      state.exclude.tags.size + state.exclude.flavours.size + state.exclude.types.size +
+    const picked = (o) => Object.values(o).reduce((n, set) => n + set.size, 0);
+    const active = picked(state.include) + picked(state.exclude) +
       state.searches.filter((q) => q.on).length + (state.newOnly ? 1 : 0) + (state.draft ? 1 : 0);
     $("clear-filters").hidden = !active;
     $("filters-count").textContent = active ? ` (${active})` : "";
@@ -327,10 +388,9 @@
     $("v-desc").textContent = img.description || "";
     $("v-folder").textContent = img.folder_path || "";
     $("v-added").textContent = fmtDate(img.drive_created_at);
-    $("v-type").textContent =
-      (img.is_render ? "Render / mockup" : "Real photo") +
-      (img.packaging ? ` · ${img.packaging === "mixed" ? "old and new" : img.packaging} packaging` : "");
-    $("v-flavours").textContent = (img.flavours || []).join(", ") || "None visible";
+    const d = designOf(img);
+    $("v-type").textContent = (img.is_render ? "Render / mockup" : "Real photo") + (DESIGN_TEXT[d] ? ` · ${DESIGN_TEXT[d]}` : "");
+    $("v-flavours").textContent = flavoursOf(img).join(", ") || "None visible";
     $("v-drive").href = img.drive_url || "#";
     $("v-prev").hidden = state.viewerIndex <= 0;
     $("v-next").hidden = state.viewerIndex >= viewerList.length - 1;
@@ -342,13 +402,13 @@
         const x = el("button", { type: "button", className: "x", textContent: "×" });
         x.setAttribute("aria-label", `Remove tag ${t}`);
         x.onclick = () => removeTag(img, t);
-        return el("span", { className: "chip" + (manual.has(t) ? " manual" : "") }, t, x);
+        return el("span", { className: "chip" + (manual.has(t) ? " manual" : "") }, label(t), x);
       })
     );
 
     const known = new Set();
     for (const i of state.images) for (const t of effectiveTags(i)) known.add(t);
-    $("tag-options").replaceChildren(...[...known].sort().map((t) => el("option", { value: t })));
+    $("tag-options").replaceChildren(...[...known].sort().map((t) => el("option", { value: t, label: label(t) })));
   }
 
   async function saveTags(img, manual, hidden) {
@@ -393,6 +453,7 @@
   // ---------------------------------------------------------------- wiring
   function start() {
     $("app").hidden = false;
+    buildFacets();
     renderNewStrip();
     refresh();
 
@@ -425,8 +486,8 @@
       $("filters-toggle").setAttribute("aria-expanded", "false");
     };
     $("clear-filters").onclick = () => {
-      state.tags.clear(); state.flavours.clear(); state.types.clear(); state.searches = []; state.draft = "";
-      for (const set of Object.values(state.exclude)) set.clear();
+      state.searches = []; state.draft = "";
+      for (const set of [...Object.values(state.include), ...Object.values(state.exclude)]) set.clear();
       state.newOnly = false;
       $("search").value = "";
       $("new-toggle").setAttribute("aria-pressed", "false");
@@ -447,7 +508,7 @@
       if (e.key === "ArrowLeft") step(-1);
       if (e.key === "ArrowRight") step(1);
     });
-    $("viewer").addEventListener("close", () => { if (state.tags.size || state.types.size) refresh(); });
+    $("viewer").addEventListener("close", () => { buildFacets(); refresh(); });
     $("v-add-form").onsubmit = (e) => {
       e.preventDefault();
       addTag(viewerList[state.viewerIndex], $("v-add").value);

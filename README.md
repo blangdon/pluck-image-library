@@ -66,7 +66,9 @@ Nothing is ever written to Drive. The tagger has read-only access.
 - **New images** are picked up within the hour. Each person sees a "new since your last visit" strip; a visit ends after 30 minutes away.
 - **Wrong tag?** Open the image, click × on the tag, or add the right one. Changes are saved for everyone.
 - **Add a teammate:** add their email in step 3.3.
-- **Change the tag list:** edit `tagger/config.yaml`. New images use the new list. To re-tag everything, run the workflow with **Re-tag every image** ticked. This costs the same as the first full run.
+- **Change the tag list or rules:** edit `tagger/config.yaml` and raise `version` by one. Every image is then re-tagged under the new rules, 400 per hourly run (or set the run's **limit** to do them all at once). This costs about the same as the first full run.
+- **Label design:** *current* = the cow stands inside a circle on the front of the label; *previous* = no circle; *unknown* = only the back or side is visible, or it's too small to tell. Unknown images appear under both Current and Previous. Colours are ignored.
+- **Flavours:** names read off labels are matched to the list in `config.yaml`; `flavour_aliases` merges other spellings (e.g. "Pure" → Pure Organs).
 - **Better shaker recognition:** add clear photos to `tagger/reference/` and list them under `reference_images` in `config.yaml`.
 - **Failures** are retried up to 3 times. The reason is saved in the `tag_error` column. Formats Pillow can't read (RAW, PSD) fall back to Drive's own preview.
 

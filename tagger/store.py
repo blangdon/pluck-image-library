@@ -31,7 +31,7 @@ class Store:
                 self.s.get(
                     f"{self.url}/rest/v1/images",
                     params={
-                        "select": "id,md5,drive_modified_at,tagged_at,thumb_path,tag_attempts",
+                        "select": "id,md5,drive_modified_at,tagged_at,tag_model,thumb_path,tag_attempts",
                         "order": "id",
                         "limit": page,
                         "offset": offset,

@@ -15,16 +15,21 @@ HERE = Path(__file__).parent
 SYSTEM = """You tag photos and graphics for Pluck, a company that makes superfood seasoning from beef organs.
 Your tags power a searchable image library, so be accurate: tag only what is actually visible.
 Pluck products come as shakers (cylindrical cans with a shaker lid) and stand-up pouches/sachets.
-There are two label generations:
-- new: cream/coloured label with a cow inside a circle, "PLUCK" in large letters, flavour name below
-- old: illustrated bull or a plain dark label with the PLUCK dots logo
-Reference photos of the products come first, followed by the image to tag."""
+There are two label designs, told apart ONLY by the front of the label (colours vary by flavour and don't matter):
+- current: a cow standing inside a solid circle on the front
+- previous: a front with no circle behind a cow (for example an illustrated bull, or a plain label with the PLUCK dots logo)
+Reference photos of both designs come first, followed by the image to tag."""
 
 INSTRUCTIONS = """Tag the image above. Rules:
 - Use only tags from the list. Include a tag when it applies, with confidence high, medium or low.
 - "pluck shaker" and "sachet" must be Pluck products; other brands' containers don't count.
 - Read flavour names off any visible Pluck label. Leave flavours empty if none can be read.
-- packaging: which Pluck label generation is shown ("new", "old", "mixed"), or "none" if no Pluck product.
+- label_design, judged from the FRONT of each visible Pluck product:
+  "current" if every front you can see has the cow in a circle;
+  "previous" if every front you can see has no circle;
+  "mixed" if both designs appear;
+  "unknown" if a Pluck product is there but you only see its back or side, or it's too small or blurry to tell;
+  "none" if there is no Pluck product.
 - is_render: true for 3D renders and mockups, false for real photos.
 - description: one plain sentence describing the image, as a person would search for it.
 Answer only by calling the record_tags tool."""
@@ -36,6 +41,7 @@ class Tagger:
         self.model = model
         self.tag_names = [t["name"] for t in config["tags"]]
         self.flavours = {f.lower(): f for f in config["flavours"]}
+        self.flavours.update({k.lower(): v for k, v in (config.get("flavour_aliases") or {}).items()})
         self.tool = self._tool(config)
         self.reference_blocks = self._references(config.get("reference_images", []))
         self.usage = {"input": 0, "cache_read": 0, "cache_write": 0, "output": 0}
@@ -67,10 +73,10 @@ class Tagger:
                         "items": {"type": "string"},
                         "description": "Flavours read off Pluck labels. Known: " + ", ".join(config["flavours"]),
                     },
-                    "packaging": {"type": "string", "enum": ["new", "old", "mixed", "none"]},
+                    "label_design": {"type": "string", "enum": ["current", "previous", "mixed", "unknown", "none"]},
                     "is_render": {"type": "boolean"},
                 },
-                "required": ["description", "tags", "flavours", "packaging", "is_render"],
+                "required": ["description", "tags", "flavours", "label_design", "is_render"],
             },
         }
 
@@ -137,13 +143,17 @@ class Tagger:
             if name and name not in flavours:
                 flavours.append(name)
 
-        packaging = raw.get("packaging")
+        design = raw.get("label_design") or raw.get("packaging")
+        if design not in ("current", "previous", "mixed", "unknown"):
+            design = None
+        if design is None and ("pluck shaker" in tags or "sachet" in tags):
+            design = "unknown"
         return {
             "description": (raw.get("description") or "").strip()[:500],
             "tags": tags,
             "tag_confidence": confidence,
             "flavours": flavours,
-            "packaging": None if packaging in (None, "none") else packaging,
+            "packaging": design,  # current / previous / mixed / unknown, or None when there's no product
             "is_render": bool(raw.get("is_render")),
         }
 
