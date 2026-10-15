@@ -183,6 +183,7 @@ button, input { font: inherit; color: inherit; }
 :root[data-theme="dark"] .new-strip { color: var(--bg); }
 .new-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .new-head h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 20px; line-height: 1.1; }
+.new-actions { display: flex; gap: 8px; }
 .new-head .btn { border-color: currentColor; color: inherit; }
 .new-head .btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .new-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }

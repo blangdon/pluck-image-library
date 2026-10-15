@@ -54,7 +54,15 @@
   const flavoursOf = (img) => [...new Set((img.flavours || []).map((f) => FLAVOUR_ALIASES[f.toLowerCase()] || f))];
   const designOf = (img) => DESIGN_NAMES[img.packaging] || img.packaging || "none";
   const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
-  const isNew = (img) => state.previousVisit && new Date(img.first_seen_at) > state.previousVisit;
+  // "New" = found since the last visit, and since the strip was last dismissed on this browser.
+  const DISMISS_KEY = "pluck-new-dismissed-at";
+  let dismissedAt = null;
+  try { const v = localStorage.getItem(DISMISS_KEY); if (v) dismissedAt = new Date(v); } catch (e) {}
+  const isNew = (img) => {
+    if (!state.previousVisit) return false;
+    const since = dismissedAt && dismissedAt > state.previousVisit ? dismissedAt : state.previousVisit;
+    return new Date(img.first_seen_at) > since;
+  };
   const fmtDate = (s) =>
     s ? new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Unknown";
   const fmtWhen = (d) =>
@@ -375,6 +383,14 @@
         return b;
       })
     );
+    $("new-dismiss").onclick = () => {
+      dismissedAt = new Date();
+      try { localStorage.setItem(DISMISS_KEY, dismissedAt.toISOString()); } catch (e) {}
+      state.newOnly = false;
+      strip.hidden = true;
+      document.title = "Pluck Library";
+      refresh();
+    };
     $("new-toggle").onclick = () => {
       state.newOnly = !state.newOnly;
       $("new-toggle").setAttribute("aria-pressed", state.newOnly);
