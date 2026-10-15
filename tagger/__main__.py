@@ -133,6 +133,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", action="store_true", help="count images only; no tagging or uploads")
     ap.add_argument("--count-videos", action="store_true", help="count videos, sizes and lengths; nothing else")
+    ap.add_argument("--quality-test", type=int, metavar="N", help="score N random images for quality with Sonnet and Haiku")
     ap.add_argument("--compare", type=int, metavar="N", help="tag N random images with Sonnet and Haiku and compare")
     args = ap.parse_args()
 
@@ -173,6 +174,11 @@ def main() -> None:
         total_mb = sum(i.size for i in images) / 1e6
         folders = len({i.folder_path for i in images})
         print(f"Found {len(images)} images ({total_mb:,.0f} MB) across {folders} folders.")
+        return
+    if args.quality_test:
+        from .quality import run as quality
+
+        quality(drive, [i for i in images if not is_video(i)], args.quality_test, env("ANTHROPIC_API_KEY"), fetch_pixels)
         return
     if args.compare:
         from .compare import run as compare

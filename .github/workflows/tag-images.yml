@@ -8,7 +8,7 @@ on:
       mode:
         description: "tag = index and tag; count = just count images (free); compare = Sonnet vs Haiku on 50 images (under $1); faces = face search only; rematch = re-run people matching only"
         type: choice
-        options: [tag, count, count-videos, compare, faces, rematch]
+        options: [tag, count, count-videos, compare, quality, faces, rematch]
         default: tag
       limit:
         description: "Most images to tag in this run (blank = default 400)"
@@ -23,6 +23,9 @@ on:
         description: "Re-tag every image (only after changing tagger/config.yaml)"
         type: boolean
         default: false
+
+permissions:
+  contents: write
 
 concurrency:
   group: tagger
@@ -57,20 +60,22 @@ jobs:
             python -m tagger --count-videos
           elif [ "${{ inputs.mode }}" = "count" ]; then
             python -m tagger --count
+          elif [ "${{ inputs.mode }}" = "quality" ]; then
+            python -m tagger --quality-test 50
           elif [ "${{ inputs.mode }}" = "compare" ]; then
             python -m tagger --compare 50
           else
             python -m tagger
           fi
       - name: Sort videos (person / POV food)
-        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'rematch' }}
+        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'rematch' && inputs.mode != 'quality' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python -m tagger.video_categories
       - name: Find people (face search)
-        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' }}
+        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'quality' }}
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_IDS: ${{ secrets.DRIVE_FOLDER_IDS }}
@@ -92,3 +97,10 @@ jobs:
         with:
           name: comparison-report
           path: comparison-report.html
+      - name: Save quality report to the reports branch
+        if: ${{ inputs.mode == 'quality' }}
+        run: |
+          mkdir /tmp/r && cp quality-report.html /tmp/r/
+          cd /tmp/r && git init -q -b reports && git add . \
+            && git -c user.name=bot -c user.email=bot@example.com commit -qm "quality report" \
+            && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" reports
