@@ -21,6 +21,7 @@
     tags: new Set(),
     flavours: new Set(),
     types: new Set(),
+    exclude: { tags: new Set(), flavours: new Set(), types: new Set() },
     newOnly: false,
     media: "image",      // "image" or "video"
     draft: "",           // what's being typed in the search box right now
@@ -136,15 +137,20 @@
   function matches(img, skip) {
     if (mediaOf(img) !== state.media) return false;
     if (state.newOnly && !isNew(img)) return false;
+    const ex = state.exclude;
     if (skip !== "tags") {
       const t = effectiveTags(img);
       for (const want of state.tags) if (!t.includes(want)) return false;
+      for (const no of ex.tags) if (t.includes(no)) return false;
     }
-    if (skip !== "flavours" && state.flavours.size) {
-      if (!(img.flavours || []).some((f) => state.flavours.has(f))) return false;
+    if (skip !== "flavours") {
+      const f = img.flavours || [];
+      if (state.flavours.size && !f.some((x) => state.flavours.has(x))) return false;
+      if (f.some((x) => ex.flavours.has(x))) return false;
     }
     if (skip !== "types") {
       for (const id of state.types) if (!TYPE_FILTERS.find((f) => f.id === id).test(img)) return false;
+      for (const id of ex.types) if (TYPE_FILTERS.find((f) => f.id === id).test(img)) return false;
     }
     const terms = [...state.searches.filter((q) => q.on).map((q) => q.text), state.draft].filter(Boolean);
     if (terms.length) {
@@ -155,14 +161,28 @@
     return true;
   }
 
-  function renderChecks(containerId, items, selected, onToggle) {
+  // A row is off, included (ticked) or excluded (dash, red, crossed out).
+  function renderChecks(containerId, items, selected, excluded) {
     $(containerId).replaceChildren(
       ...items.map(({ key, label, count }) => {
         const on = selected.has(key);
-        const box = el("input", { type: "checkbox", checked: on, disabled: !on && count === 0 });
-        box.onchange = () => { onToggle(key); refresh(); };
-        return el("label", { className: "check" + (!on && count === 0 ? " zero" : "") },
-          box, el("span", { className: "label", textContent: label }), el("span", { className: "n", textContent: count }));
+        const out = excluded.has(key);
+        const zero = !on && !out && count === 0;
+        const box = el("input", { type: "checkbox", checked: on, disabled: zero });
+        box.indeterminate = out;
+        box.setAttribute("aria-label", out ? `${label}: excluded. Click to stop excluding` : label);
+        box.onchange = () => {
+          if (out) excluded.delete(key);
+          else toggle(selected, key);
+          refresh();
+        };
+        const no = el("button", { type: "button", className: "exclude", textContent: "Exclude", disabled: zero });
+        no.setAttribute("aria-label", `Exclude ${label}`);
+        no.onclick = () => { selected.delete(key); excluded.add(key); refresh(); };
+        return el("div", { className: "check" + (zero ? " zero" : "") + (out ? " excluded" : "") + (on ? " included" : "") },
+          el("label", {}, box, el("span", { className: "label", textContent: label })),
+          el("span", { className: "n", textContent: out ? "excluded" : count }),
+          out ? null : no);
       })
     );
   }
@@ -194,9 +214,12 @@
     for (const i of state.images) for (const t of effectiveTags(i)) tagCounts.set(t, 0);
     for (const i of state.shown) for (const t of effectiveTags(i)) tagCounts.set(t, tagCounts.get(t) + 1);
     const tagItems = [...tagCounts.keys()]
-      .sort((a, b) => (tagCounts.get(b) - tagCounts.get(a)) || a.localeCompare(b))
+      .sort((a, b) => {
+        const pinned = (t) => (state.tags.has(t) || state.exclude.tags.has(t) ? 1 : 0);
+        return pinned(b) - pinned(a) || tagCounts.get(b) - tagCounts.get(a) || a.localeCompare(b);
+      })
       .map((t) => ({ key: t, label: t, count: tagCounts.get(t) }));
-    renderChecks("tag-chips", tagItems, state.tags, (k) => toggle(state.tags, k));
+    renderChecks("tag-chips", tagItems, state.tags, state.exclude.tags);
 
     // Flavour chips combine with OR, so count against everything but the flavour filter.
     const base = state.images.filter((i) => matches(i, "flavours"));
@@ -204,10 +227,10 @@
     for (const i of state.images) for (const f of i.flavours || []) flav.set(f, 0);
     for (const i of base) for (const f of i.flavours || []) flav.set(f, flav.get(f) + 1);
     const flavItems = [...flav.keys()].sort().map((f) => ({ key: f, label: f, count: flav.get(f) }));
-    renderChecks("flavour-chips", flavItems, state.flavours, (k) => toggle(state.flavours, k));
+    renderChecks("flavour-chips", flavItems, state.flavours, state.exclude.flavours);
 
     const typeItems = TYPE_FILTERS.map((f) => ({ key: f.id, label: f.label, count: state.shown.filter(f.test).length }));
-    renderChecks("type-chips", typeItems, state.types, (k) => toggle(state.types, k));
+    renderChecks("type-chips", typeItems, state.types, state.exclude.types);
 
     renderSearches();
     const nImages = state.images.filter((i) => mediaOf(i) === "image").length;
@@ -217,6 +240,7 @@
     $("media-video").setAttribute("aria-pressed", state.media === "video");
     const total = state.media === "image" ? nImages : state.images.length - nImages;
     const active = state.tags.size + state.flavours.size + state.types.size +
+      state.exclude.tags.size + state.exclude.flavours.size + state.exclude.types.size +
       state.searches.filter((q) => q.on).length + (state.newOnly ? 1 : 0) + (state.draft ? 1 : 0);
     $("clear-filters").hidden = !active;
     $("filters-count").textContent = active ? ` (${active})` : "";
@@ -402,6 +426,7 @@
     };
     $("clear-filters").onclick = () => {
       state.tags.clear(); state.flavours.clear(); state.types.clear(); state.searches = []; state.draft = "";
+      for (const set of Object.values(state.exclude)) set.clear();
       state.newOnly = false;
       $("search").value = "";
       $("new-toggle").setAttribute("aria-pressed", "false");

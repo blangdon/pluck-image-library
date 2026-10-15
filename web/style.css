@@ -122,16 +122,31 @@ button, input { font: inherit; color: inherit; }
 }
 .checks { display: grid; gap: 1px; }
 .check {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
-  padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px;
+  padding: 3px 4px 3px 6px; border-radius: 8px; font-size: 14px; min-height: 32px;
 }
 .check:hover { background: var(--chip); }
-.check input { margin: 0; width: 16px; height: 16px; accent-color: var(--teal); cursor: pointer; }
+.check label { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.check input { flex: none; margin: 0; width: 16px; height: 16px; accent-color: var(--teal); cursor: pointer; }
 .check .label { min-width: 0; overflow-wrap: anywhere; }
 .check .n { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.check.zero { opacity: .45; cursor: default; }
-.check.zero input { cursor: default; }
-.search-item { grid-template-columns: 1fr auto; padding-right: 2px; }
+.check.zero { opacity: .45; }
+.check.zero label, .check.zero input { cursor: default; }
+.check.included .label { font-weight: 600; }
+.check.excluded { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.check.excluded input { accent-color: var(--accent); }
+.check.excluded .label { text-decoration: line-through; color: var(--accent); }
+.check.excluded .n { color: var(--accent); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.check .exclude {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px; cursor: pointer;
+  padding: 2px 8px; font-size: 11px; color: var(--muted);
+  opacity: 0; pointer-events: none;
+}
+.check:hover .exclude, .check:focus-within .exclude { opacity: 1; pointer-events: auto; }
+.check .exclude:hover { color: var(--accent); border-color: var(--accent); }
+.check.zero .exclude { display: none; }
+@media (hover: none) { .check .exclude { opacity: 1; pointer-events: auto; } }
+.search-item { grid-template-columns: minmax(0, 1fr) auto; padding-right: 2px; }
 .search-item label { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
 .search-item .label { font-weight: 500; }
 .search-item.off .label { color: var(--muted); text-decoration: line-through; }
