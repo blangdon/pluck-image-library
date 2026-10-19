@@ -266,3 +266,6 @@ button, input { font: inherit; color: inherit; }
 .viewer-info .btn.primary { margin-top: auto; }
 
 @media (prefers-reduced-motion: reduce) { .card img { transition: none; } }
+
+.v-hint{margin:6px 0 0;font-size:14px;text-align:center;color:inherit;opacity:.8}
+.v-hint a{color:inherit;text-decoration:underline}

@@ -481,6 +481,8 @@
     // Drive's own player: plays for anyone signed in to Google with access to the Shared Drive.
     const playUrl = isVideo ? `https://drive.google.com/file/d/${encodeURIComponent(img.id)}/preview` : "about:blank";
     if ($("v-video").src !== playUrl) $("v-video").src = playUrl;
+    $("v-video-hint").hidden = !isVideo;
+    $("v-video-drive").href = `https://drive.google.com/file/d/${encodeURIComponent(img.id)}/view`;
     $("v-img").src = isVideo ? "" : state.urls.get(img.thumb_path) || "";
     $("v-img").alt = img.description || img.name;
     $("v-name").textContent = img.name;
