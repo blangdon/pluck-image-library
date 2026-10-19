@@ -90,8 +90,8 @@
     <div class="viewer-inner">
       <div class="viewer-media">
         <img id="v-img" alt="">
-        <iframe id="v-video" title="Video player" allow="autoplay; fullscreen" allowfullscreen hidden></iframe>
-        <p class="v-hint" id="v-video-hint" hidden>Video not playing? <a id="v-video-drive" href="#" target="_blank" rel="noopener">Open it in Google Drive</a>.</p>
+        <video id="v-video" controls playsinline preload="metadata" hidden></video>
+        <p class="v-hint" id="v-video-hint" hidden>Not playing? <a id="v-video-drive" href="#" target="_blank" rel="noopener">Open it in Google Drive</a>.</p>
         <button class="nav prev" id="v-prev" type="button" aria-label="Previous image">‹</button>
         <button class="nav next" id="v-next" type="button" aria-label="Next image">›</button>
       </div>
