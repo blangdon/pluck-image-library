@@ -4,6 +4,7 @@
 // Access: the signed-in person's token must be able to see the file in the images table (same rules as the site).
 const crypto = require("crypto");
 
+const CHUNK = 8 * 1024 * 1024;
 let driveToken = null; // { token, exp }
 const seen = new Map(); // "token|id" -> expiry ms
 
@@ -46,7 +47,11 @@ module.exports = async (req, res) => {
     if (!(await allowed(t, id))) return res.status(403).end("No access");
 
     const headers = { authorization: `Bearer ${await googleToken()}` };
-    if (req.headers.range) headers.range = req.headers.range;
+    // Serve at most 8 MB per request so each one finishes quickly; the browser asks for the next piece itself.
+    const m = /bytes=(\d+)-(\d*)/.exec(req.headers.range || "bytes=0-");
+    const start = Number(m[1]);
+    const end = m[2] ? Math.min(Number(m[2]), start + CHUNK - 1) : start + CHUNK - 1;
+    headers.range = `bytes=${start}-${end}`;
     const d = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, { headers });
     if (!d.ok && d.status !== 206) return res.status(d.status).end("Drive error");
 
