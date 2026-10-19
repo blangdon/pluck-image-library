@@ -424,16 +424,17 @@
 
   // ---------------------------------------------------------------- new strip
   function renderNewStrip() {
-    const fresh = state.images.filter(isNew);
+    const fresh = state.images.filter((i) => isNew(i) && mediaOf(i) === state.media);
+    const kind = state.media === "video" ? "videos" : "images";
     const strip = $("new-strip");
     if (!state.previousVisit) {
       strip.hidden = false;
-      $("new-title").textContent = "Welcome. From your next visit, new images will show up here.";
+      $("new-title").textContent = `Welcome. From your next visit, new ${kind} will show up here.`;
       $("new-toggle").hidden = true;
       $("new-row").hidden = true;
       return;
     }
-    if (!fresh.length) { strip.hidden = true; return; }
+    if (!fresh.length) { strip.hidden = true; document.title = "Pluck Library"; return; }
     strip.hidden = false;
     $("new-title").textContent =
       `${fresh.length} new since your last visit (${fmtWhen(state.previousVisit)})`;
@@ -569,7 +570,7 @@
       t = setTimeout(() => { state.draft = e.target.value.trim().toLowerCase(); refresh(); }, 150);
     };
     for (const m of ["image", "video"]) {
-      $(`media-${m}`).onclick = () => { if (state.media !== m) { state.media = m; refresh(); } };
+      $(`media-${m}`).onclick = () => { if (state.media !== m) { state.media = m; renderNewStrip(); refresh(); } };
     }
     $("search-form").onsubmit = (e) => {
       e.preventDefault();
