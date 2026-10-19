@@ -479,17 +479,9 @@
     const isVideo = mediaOf(img) === "video";
     $("v-img").hidden = isVideo;
     $("v-video").hidden = !isVideo;
-    // Streamed through our own /api/video (no Google cookies needed in the browser).
-    const vid = $("v-video");
-    if (!isVideo) { vid.pause(); vid.removeAttribute("src"); vid.dataset.id = ""; }
-    else if (vid.dataset.id !== img.id) {
-      vid.dataset.id = img.id;
-      vid.poster = state.urls.get(img.thumb_path) || "";
-      (sb ? sb.auth.getSession() : Promise.resolve({ data: {} })).then(({ data }) => {
-        if (vid.dataset.id !== img.id) return;
-        vid.src = `/api/video?id=${encodeURIComponent(img.id)}&t=${encodeURIComponent(data.session?.access_token || "")}`;
-      });
-    }
+    // Drive's own player: plays for anyone signed in to Google with access to the Shared Drive.
+    const playUrl = isVideo ? `https://drive.google.com/file/d/${encodeURIComponent(img.id)}/preview` : "about:blank";
+    if ($("v-video").src !== playUrl) $("v-video").src = playUrl;
     $("v-video-hint").hidden = !isVideo;
     $("v-video-drive").href = `https://drive.google.com/file/d/${encodeURIComponent(img.id)}/view`;
     $("v-img").src = isVideo ? "" : state.urls.get(img.thumb_path) || "";
@@ -615,7 +607,7 @@
     }, { rootMargin: "800px" }).observe($("sentinel"));
 
     $("v-close").onclick = () => $("viewer").close();
-    $("viewer").addEventListener("close", () => { const v = $("v-video"); v.pause(); v.removeAttribute("src"); v.dataset.id = ""; });  // stop playback
+    $("viewer").addEventListener("close", () => { $("v-video").src = "about:blank"; });  // stop playback
     $("v-prev").onclick = () => step(-1);
     $("v-next").onclick = () => step(1);
     $("viewer").addEventListener("click", (e) => { if (e.target === $("viewer")) $("viewer").close(); });
