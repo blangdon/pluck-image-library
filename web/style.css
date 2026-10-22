@@ -88,6 +88,9 @@ button, input { font: inherit; color: inherit; }
 .gate { max-width: 640px; margin: 12vh auto 0; padding-block: 24px; display: grid; gap: 16px; justify-items: start; }
 .gate h1 { font-family: var(--display); font-weight: 400; font-size: clamp(28px, 5vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance; color: var(--teal); }
 .gate p { margin: 0; color: var(--muted); max-width: 60ch; }
+.gate .gate-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.gate .gate-msg { color: var(--teal); font-weight: 500; }
+.gate a.btn { text-decoration: none; }
 
 /* New strip */
 .layout {

@@ -107,9 +107,45 @@
     $("account-email").textContent = email;
     $("account").hidden = false;
 
+    // Approval link from the access-request email: ?approve=someone@example.com
+    const approveTarget = new URLSearchParams(location.search).get("approve");
+    if (approveTarget) {
+      const { data: isAdmin } = await sb.rpc("is_library_admin");
+      $("approve-email").textContent = approveTarget;
+      $("gate-approve").hidden = false;
+      const amsg = $("approve-msg");
+      if (!isAdmin) { amsg.textContent = `Only the library admin can approve access. You're signed in as ${email}.`; amsg.hidden = false; $("approve-yes").hidden = true; return; }
+      $("approve-yes").onclick = async () => {
+        $("approve-yes").disabled = true;
+        const { error: aerr } = await sb.rpc("approve_access", { target: approveTarget });
+        amsg.hidden = false;
+        if (aerr) { amsg.textContent = `Couldn't approve: ${aerr.message}`; $("approve-yes").disabled = false; return; }
+        amsg.textContent = `✓ ${approveTarget} now has access. They can reload the library and sign in.`;
+        $("approve-yes").hidden = true; $("approve-skip").textContent = "Open the library";
+      };
+      return;
+    }
+
     const { data: allowed, error } = await sb.rpc("is_allowed");
     if (error) return showStatus(`Couldn't check your access: ${error.message}`);
-    if (!allowed) { $("denied-email").textContent = email; $("gate-denied").hidden = false; return; }
+    if (!allowed) {
+      $("denied-email").textContent = email; $("gate-denied").hidden = false;
+      const rmsg = $("request-msg"), rbtn = $("request-access");
+      const say = (t) => { rmsg.textContent = t; rmsg.hidden = false; };
+      rbtn.onclick = async () => {
+        rbtn.disabled = true;
+        const { data: st, error: rerr } = await sb.rpc("request_access");
+        if (rerr) { say(`Couldn't send the request: ${rerr.message}`); rbtn.disabled = false; return; }
+        if (st === "approved") return location.reload();
+        if (st === "new") {
+          const meta = session.user.user_metadata || {};
+          try { await fetch(cfg.accessRequestUrl || "https://newgrounddigital.app.n8n.cloud/webhook/pluck-library-access-f481f67f7fdb7ed0", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name: meta.full_name || meta.name || "" }) }); } catch (e) { /* the request is saved either way */ }
+        }
+        rbtn.hidden = true;
+        say(st === "new" ? "Request sent. You'll be able to get in once it's approved; just reload this page then." : "You've already requested access. It's waiting for approval; reload this page once you've been approved.");
+      };
+      return;
+    }
 
     const { data: prev } = await sb.rpc("start_visit");
     state.previousVisit = prev ? new Date(prev) : null;
