@@ -1,4 +1,4 @@
--- Pluck Image Library: database schema
+-- Pluck Asset Library: database schema
 -- Run this once in Supabase: Dashboard -> SQL Editor -> New query -> paste -> Run.
 -- Safe to re-run: it only creates what's missing and replaces functions/policies.
 
@@ -156,7 +156,7 @@ drop policy if exists "team can view thumbnails" on storage.objects;
 create policy "team can view thumbnails" on storage.objects
   for select to authenticated using (bucket_id = 'thumbs' and is_allowed());
 
--- Pluck Image Library: access requests
+-- Pluck Asset Library: access requests
 -- Run once in Supabase: Dashboard -> SQL Editor -> New query -> paste -> Run. Safe to re-run.
 -- Also included at the end of schema.sql.
 

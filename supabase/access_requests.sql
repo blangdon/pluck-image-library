@@ -1,4 +1,4 @@
--- Pluck Image Library: access requests
+-- Pluck Asset Library: access requests
 -- Run once in Supabase: Dashboard -> SQL Editor -> New query -> paste -> Run. Safe to re-run.
 -- Also included at the end of schema.sql.
 

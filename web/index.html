@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Pluck Library</title>
+  <title>Pluck Asset Library</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -13,7 +13,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="wordmark">PLUCK</span>
-      <span class="brand-sub">Image Library</span>
+      <span class="brand-sub">Asset Library</span>
     </div>
     <button class="btn small filters-toggle" id="filters-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Filters<span id="filters-count"></span></button>
     <div class="account" id="account" hidden>
@@ -31,7 +31,7 @@
 
   <!-- Signed in but not on the list -->
   <section class="gate" id="gate-denied" hidden>
-    <h1>Request access to the library.</h1>
+    <h1>Request access to the asset library.</h1>
     <p>You're signed in as <strong id="denied-email"></strong>, which isn't on the team list yet. Request access and the library's admin will get an email to approve you.</p>
     <p class="gate-msg" id="request-msg" hidden></p>
     <div class="gate-actions">
@@ -43,7 +43,7 @@
   <!-- Admin approving a request from the email link -->
   <section class="gate" id="gate-approve" hidden>
     <h1>Approve access?</h1>
-    <p>Give <strong id="approve-email"></strong> access to the image library.</p>
+    <p>Give <strong id="approve-email"></strong> access to the asset library.</p>
     <p class="gate-msg" id="approve-msg" hidden></p>
     <div class="gate-actions">
       <button class="btn primary" id="approve-yes" type="button">Approve</button>

@@ -1,4 +1,4 @@
-# Pluck Image Library
+# Pluck Asset Library
 
 A searchable, AI-tagged gallery of every image in the Pluck Google Drive.
 

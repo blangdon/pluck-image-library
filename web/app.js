@@ -1,4 +1,4 @@
-/* Pluck Image Library: browse, filter and correct AI tags on Drive images. */
+/* Pluck Asset Library: browse, filter and correct AI tags on Drive images. */
 (() => {
   "use strict";
 
@@ -74,7 +74,8 @@
   const label = (t) => LABELS[t] || t.charAt(0).toUpperCase() + t.slice(1);
   // "New" = found since the last visit, and since the strip was last dismissed on this browser.
   const DISMISS_KEY = "pluck-new-dismissed-at";
-  let dismissedAt = null;
+  let dismissedAt = null, welcomeDismissed = false;
+  try { welcomeDismissed = localStorage.getItem("pluck-welcome-dismissed") === "1"; } catch (e) {}
   try { const v = localStorage.getItem(DISMISS_KEY); if (v) dismissedAt = new Date(v); } catch (e) {}
   const isNew = (img) => {
     if (!state.previousVisit) return false;
@@ -463,18 +464,27 @@
     const fresh = state.images.filter((i) => isNew(i) && mediaOf(i) === state.media);
     const kind = state.media === "video" ? "videos" : "images";
     const strip = $("new-strip");
+    $("new-dismiss").onclick = () => {
+      dismissedAt = new Date();
+      try { localStorage.setItem(DISMISS_KEY, dismissedAt.toISOString()); localStorage.setItem("pluck-welcome-dismissed", "1"); } catch (e) {}
+      welcomeDismissed = true;
+      state.newOnly = false;
+      strip.hidden = true;
+      document.title = "Pluck Asset Library";
+      refresh();
+    };
     if (!state.previousVisit) {
-      strip.hidden = false;
+      strip.hidden = welcomeDismissed;
       $("new-title").textContent = `Welcome. From your next visit, new ${kind} will show up here.`;
       $("new-toggle").hidden = true;
       $("new-row").hidden = true;
       return;
     }
-    if (!fresh.length) { strip.hidden = true; document.title = "Pluck Library"; return; }
+    if (!fresh.length) { strip.hidden = true; document.title = "Pluck Asset Library"; return; }
     strip.hidden = false;
     $("new-title").textContent =
       `${fresh.length} new since your last visit (${fmtWhen(state.previousVisit)})`;
-    document.title = `(${fresh.length}) Pluck Library`;
+    document.title = `(${fresh.length}) Pluck Asset Library`;
     $("new-row").replaceChildren(
       ...fresh.slice(0, 30).map((img) => {
         const b = el("button", { type: "button" },
@@ -483,14 +493,6 @@
         return b;
       })
     );
-    $("new-dismiss").onclick = () => {
-      dismissedAt = new Date();
-      try { localStorage.setItem(DISMISS_KEY, dismissedAt.toISOString()); } catch (e) {}
-      state.newOnly = false;
-      strip.hidden = true;
-      document.title = "Pluck Library";
-      refresh();
-    };
     $("new-toggle").onclick = () => {
       state.newOnly = !state.newOnly;
       $("new-toggle").setAttribute("aria-pressed", state.newOnly);
