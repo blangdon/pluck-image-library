@@ -29,7 +29,7 @@ MODEL = os.environ.get("RECIPES_MODEL") or "claude-haiku-5-5"
 FOLDER = "application/vnd.google-apps.folder"
 GDOC = "application/vnd.google-apps.document"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-VERSION = "r1"  # bump to make every folder re-read
+VERSION = "r2"  # bump to make every folder re-read
 
 TOOL = {
     "name": "record_folder",
@@ -93,7 +93,7 @@ def _children(drive, folder_id: str) -> list[dict]:
     while True:
         r = drive.api.files().list(
             q=f"'{folder_id}' in parents and trashed = false",
-            fields="nextPageToken, files(id, name, mimeType, modifiedTime, webViewLink)",
+            fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, webViewLink)",
             pageSize=1000, pageToken=token, supportsAllDrives=True, includeItemsFromAllDrives=True,
         ).execute(num_retries=5)
         out += r.get("files", [])
@@ -139,15 +139,15 @@ def main() -> None:
     print(f"Reading {root_path}…", flush=True)
 
     # Walk the tree: one entry per folder (the root's loose files become a "Loose files" collection).
-    folders, stack = [], [(ROOT_ID, root_path, None, 0)]
+    folders, stack = [], [(ROOT_ID, root_path, None, 0, None)]
     while stack:
-        fid, path, parent, depth = stack.pop()
+        fid, path, parent, depth, created = stack.pop()
         kids = _children(drive, fid)
         subs = [k for k in kids if k["mimeType"] == FOLDER]
         files = [k for k in kids if k["mimeType"] != FOLDER and not k["name"].startswith(".")]
-        folders.append({"id": fid, "path": path, "parent": parent, "depth": depth, "subs": subs, "files": files})
+        folders.append({"id": fid, "path": path, "parent": parent, "depth": depth, "subs": subs, "files": files, "created": created})
         for s in subs:
-            stack.append((s["id"], f"{path}/{s['name']}", fid, depth + 1))
+            stack.append((s["id"], f"{path}/{s['name']}", fid, depth + 1, s.get("createdTime")))
     print(f"Found {len(folders) - 1} folders.", flush=True)
 
     client = anthropic.Anthropic(api_key=env("ANTHROPIC_API_KEY"), max_retries=4)
@@ -168,6 +168,7 @@ def main() -> None:
             "id": f["id"], "parent_id": f["parent"], "depth": f["depth"], "name": f["path"].rsplit("/", 1)[-1],
             "folder_path": f["path"], "sig": sig, "doc_id": docs[0]["id"] if docs else None,
             "doc_url": docs[0].get("webViewLink") if docs else None, "media_here": len(media),
+            "drive_created_at": f["created"],
         }
         if f["depth"] == 0:
             row.update(kind="collection", title="Loose files", name="Loose files")

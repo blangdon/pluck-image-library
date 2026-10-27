@@ -30,7 +30,7 @@
   prefs.rView = prefs.rView || "tiles"; prefs.rSort = prefs.rSort || "name"; prefs.cSort = prefs.cSort || "name";
   const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) {} };
   const SORTS = {
-    recipes: { name: "Name A–Z", newest: "Newest", collection: "Collection", photos: "Most photos", videos: "Most videos" },
+    recipes: { name: "Name A–Z", newest: "Date created (newest)", oldest: "Date created (oldest)", collection: "Collection", photos: "Most photos", videos: "Most videos" },
     collections: { name: "Name A–Z", recipes: "Most recipes", photos: "Most photos", videos: "Most videos", newest: "Newest" },
   };
 
@@ -153,7 +153,10 @@
       let c = null;
       for (let p = state.byId.get(s.parent_id); p && !c; p = state.byId.get(p.parent_id)) if (p.kind === "collection" && p.depth > 0) c = p;
       s._coll = c;
-      s._newest = Math.max(Date.parse(s.first_seen_at || s.updated_at || 0) || 0, ...s._all.map((m) => Date.parse(m.drive_created_at || 0) || 0));
+      const ids = s._folders || [s.id];
+      const made = ids.map((id) => Date.parse((state.byId.get(id) || {}).drive_created_at || "") || 0).filter(Boolean);
+      s._created = made.length ? Math.min(...made) : 0;
+      s._newest = s._created || Math.max(0, ...s._all.map((m) => Date.parse(m.drive_created_at || 0) || 0));
     }
   }
 
@@ -222,7 +225,7 @@
       group.append(list);
       box.append(group);
     }
-    $("clear").hidden = !anyFilter();
+    $("clear").hidden = !anyFilter() || !usesFacets;
   }
 
   function toggle(facet, v, only = false) {
@@ -287,9 +290,18 @@
   }
 
   const byName = (a, b) => a._title.localeCompare(b._title);
+  // Every recipe inside a folder, at any depth (merged duplicates count once).
+  const recipesIn = (c) => {
+    const out = new Set();
+    const walk = (s) => { for (const k of s._kids) { if (k.kind === "recipe") out.add(k._mergedInto || k); else walk(k); } };
+    walk(c);
+    return [...out];
+  };
+  const fmtDate = (t) => (t ? new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—");
   function sortRecipes(list) {
     const k = prefs.rSort;
     if (k === "newest") return list.sort((a, b) => b._newest - a._newest || byName(a, b));
+    if (k === "oldest") return list.sort((a, b) => (a._newest || Infinity) - (b._newest || Infinity) || byName(a, b));
     if (k === "photos") return list.sort((a, b) => b._photos.length - a._photos.length || byName(a, b));
     if (k === "videos") return list.sort((a, b) => b._videos.length - a._videos.length || byName(a, b));
     if (k === "collection") return list.sort((a, b) => (a._coll ? 0 : 1) - (b._coll ? 0 : 1) || (a._coll ? a._coll._title : "").localeCompare(b._coll ? b._coll._title : "") || byName(a, b));
@@ -302,6 +314,9 @@
     $("count").textContent = `${list.length} of ${recipes().length} recipes`;
     view.className = prefs.rView === "list" ? "rows" : "cards";
     if (!list.length) return view.append(el("p", { className: "empty", textContent: "No recipes match. Try removing a filter." }));
+    if (prefs.rView === "list") {
+      view.append(el("div", { className: "row-head" }, el("span"), el("span", { textContent: "Recipe" }), el("span", { textContent: "Files" }), el("span", { textContent: "Date created" }), el("span")));
+    }
     let lastColl;
     for (const r of list) {
       if (prefs.rSort === "collection" && r._coll !== lastColl) {
@@ -326,7 +341,8 @@
     for (const p of valuesOf(r, "proteins").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: p }));
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     text.append(tags);
-    b.append(t, text, el("p", { className: "row-meta right", textContent: countsText(r) }), el("span", { className: "chev", textContent: "›" }));
+    b.append(t, text, el("p", { className: "row-meta right", textContent: countsText(r) }),
+      el("p", { className: "row-date", textContent: fmtDate(r._created) }), el("span", { className: "chev", textContent: "›" }));
     if (isNew(r)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
     b.onclick = () => openSheet(r.id);
     return b;
@@ -352,6 +368,7 @@
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     body.append(tags);
     body.append(el("p", { className: "counts", textContent: countsText(r) }));
+    if (r._created) body.append(el("p", { className: "counts", textContent: `Created ${fmtDate(r._created)}` }));
     b.append(body);
     if (isNew(r)) b.append(el("span", { className: "new-badge", textContent: "NEW" }));
     b.onclick = () => (r.kind === "collection" ? (closeSheet(), openCollection(r.id)) : openSheet(r.id));
@@ -388,7 +405,7 @@
     } else {
       groups = groups.filter((s) => !q || s._text.includes(q));
       renderControls("collections");
-      const nr = (c) => c._kids.filter((k) => k.kind === "recipe" && !k._mergedInto).length;
+      const nr = (c) => recipesIn(c).length;
       const k = prefs.cSort;
       groups.sort(k === "recipes" ? (a, b) => nr(b) - nr(a) || byName(a, b)
         : k === "photos" ? (a, b) => b._photos.length - a._photos.length || byName(a, b)
@@ -403,15 +420,16 @@
       const media = kind === "creator" ? [...new Set([...(g.set ? g.set._all : []), ...g.recipes.flatMap((r) => r._all)])] : g._all;
       const rs = kind === "creator"
         ? [...new Set([...g.recipes, ...(g.set ? g.set._kids.filter((k) => k.kind === "recipe" && !k._mergedInto) : [])])]
-        : g._kids.filter((k) => k.kind === "recipe" && !k._mergedInto);
-      const b = el("button", { type: "button", className: "row" });
+        : recipesIn(g);
+      const b = el("button", { type: "button", className: "row coll-row" });
+      b.append(el("div", { className: "big-count" + (rs.length ? "" : " zero") },
+        el("strong", { textContent: rs.length }), el("span", { textContent: rs.length === 1 ? "recipe" : "recipes" })));
       const text = el("div", { className: "row-text" });
       text.append(el("h3", { textContent: name }));
       const nP = media.filter((m) => !isVideo(m)).length, nV = media.length - nP;
       text.append(el("p", { className: "row-meta", textContent: [
-        rs.length ? `${rs.length} recipe${rs.length === 1 ? "" : "s"}` : "",
         nP ? `${nP} photo${nP === 1 ? "" : "s"}` : "", nV ? `${nV} video${nV === 1 ? "" : "s"}` : "",
-      ].filter(Boolean).join(" · ") || "Empty" }));
+      ].filter(Boolean).join(" · ") || "No photos or videos" }));
       if (rs.length) text.append(el("p", { className: "row-sub", textContent: rs.slice(0, 4).map((r) => r._title).join(", ") + (rs.length > 4 ? ` and ${rs.length - 4} more` : "") }));
       b.append(text);
       const strip = el("div", { className: "strip" });
