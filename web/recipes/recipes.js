@@ -14,9 +14,17 @@
 
   const FLAVOUR_ALIASES = { pure: "Pure Organs", "pure organ": "Pure Organs", "pluck original": "Original", "habernero lime": "Habanero Lime" };
   const FACETS = [
-    { id: "has", title: "Has" },
+    { id: "has", title: "What's in the recipe" },
   ];
-  const HAS = { photos: "Photos", videos: "Videos", doc: "Recipe doc" };
+  // Every recipe is one of these, by what its folder holds.
+  const HAS = {
+    full: "Doc + photos + videos", docphotos: "Doc + photos", docvideos: "Doc + videos", doc: "Doc only",
+    photosvideos: "Photos + videos (no doc)", photos: "Photos only", videos: "Videos only", empty: "Empty folder",
+  };
+  const contentsOf = (r) => {
+    const d = !!r.doc_url, p = r._photos.length > 0, v = r._videos.length > 0;
+    return d ? (p && v ? "full" : p ? "docphotos" : v ? "docvideos" : "doc") : (p && v ? "photosvideos" : p ? "photos" : v ? "videos" : "empty");
+  };
   const TABS = { recipes: "recipes", creators: "creators", collections: "collections", media: "photos and videos" };
 
   const state = {
@@ -46,7 +54,7 @@
   // Values of one facet for a recipe (display form, de-duplicated).
   function valuesOf(r, facet) {
     if (facet === "creator") return r._creator ? [r._creator] : [];
-    if (facet === "has") return [r._photos.length && "photos", r._videos.length && "videos", r.doc_url && "doc"].filter(Boolean);
+    if (facet === "has") return [contentsOf(r)];
     if (facet === "flavours") return [...new Set((r.flavours || []).map(flavourName))];
     return [...new Set((r[facet] || []).map((v) => cap(norm(v))).filter((v) => v && v !== "None"))];
   }
@@ -314,17 +322,35 @@
     $("count").textContent = `${list.length} of ${recipes().length} recipes`;
     view.className = prefs.rView === "list" ? "rows" : "cards";
     if (!list.length) return view.append(el("p", { className: "empty", textContent: "No recipes match. Try removing a filter." }));
-    if (prefs.rView === "list") {
-      view.append(el("div", { className: "row-head" }, el("span"), el("span", { textContent: "Recipe" }), el("span", { textContent: "Files" }), el("span", { textContent: "Date created" }), el("span")));
-    }
-    let lastColl;
+    renderRecipeList(view, list, prefs.rSort === "collection" ? (r) => (r._coll ? r._coll._title : "Not in a collection") : null);
+  }
+
+  // Shared by All Recipes and a collection's page: tiles or list, optionally under group headings.
+  function renderRecipeList(view, list, groupOf) {
+    view.className = prefs.rView === "list" ? "rows" : "cards";
+    if (prefs.rView === "list") view.append(recipeHead());
+    let last;
     for (const r of list) {
-      if (prefs.rSort === "collection" && r._coll !== lastColl) {
-        lastColl = r._coll;
-        view.append(el("h3", { className: "group-head", textContent: r._coll ? r._coll._title : "Not in a collection" }));
+      if (groupOf) {
+        const g = groupOf(r);
+        if (g !== last) {
+          last = g;
+          const n = list.filter((x) => groupOf(x) === g).length;
+          view.append(el("h3", { className: "group-head" }, g, el("span", { className: "n", textContent: n })));
+        }
       }
       view.append(prefs.rView === "list" ? recipeRow(r) : recipeCard(r));
     }
+  }
+
+  const recipeHead = () => el("div", { className: "row-head" }, el("span"), el("span", { textContent: "Recipe" }),
+    el("span", { className: "num", textContent: "Doc" }), el("span", { className: "num", textContent: "Photos" }),
+    el("span", { className: "num", textContent: "Videos" }), el("span", { textContent: "Date created" }), el("span"));
+
+  // Doc / photos / videos as three fixed cells, so a column of recipes scans at a glance.
+  function statCells(docs, photos, videos) {
+    const cell = (n, txt) => el("span", { className: "stat" + (n ? "" : " zero"), textContent: txt });
+    return [cell(docs, docs === true ? "✓" : docs ? String(docs) : "—"), cell(photos, photos ? String(photos) : "—"), cell(videos, videos ? String(videos) : "—")];
   }
 
   function recipeRow(r) {
@@ -341,7 +367,7 @@
     for (const p of valuesOf(r, "proteins").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: p }));
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     text.append(tags);
-    b.append(t, text, el("p", { className: "row-meta right", textContent: countsText(r) }),
+    b.append(t, text, ...statCells(!!r.doc_url, r._photos.length, r._videos.length),
       el("p", { className: "row-date", textContent: fmtDate(r._created) }), el("span", { className: "chev", textContent: "›" }));
     if (isNew(r)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
     b.onclick = () => openSheet(r.id);
@@ -367,7 +393,11 @@
     for (const p of valuesOf(r, "proteins").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: p }));
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     body.append(tags);
-    body.append(el("p", { className: "counts", textContent: countsText(r) }));
+    const has = el("div", { className: "has" });
+    has.append(el("span", { className: "has-doc" + (r.doc_url ? "" : " off"), textContent: "Doc" }),
+      el("span", { className: r._photos.length ? "" : "off", textContent: `${r._photos.length} photo${r._photos.length === 1 ? "" : "s"}` }),
+      el("span", { className: r._videos.length ? "" : "off", textContent: `${r._videos.length} video${r._videos.length === 1 ? "" : "s"}` }));
+    body.append(has);
     if (r._created) body.append(el("p", { className: "counts", textContent: `Created ${fmtDate(r._created)}` }));
     b.append(body);
     if (isNew(r)) b.append(el("span", { className: "new-badge", textContent: "NEW" }));
@@ -415,6 +445,13 @@
     }
     view.className = "rows";
     if (!groups.length) return view.append(el("p", { className: "empty", textContent: "Nothing matches." }));
+    if (kind !== "creator") {
+      view.append(el("div", { className: "row-head coll-head-row" }, el("span", { textContent: "Recipes" }), el("span", { textContent: "Collection" }),
+        el("span", { className: "num", textContent: "With doc" }), el("span", { className: "num", textContent: "With photos" }),
+        el("span", { className: "num", textContent: "With videos" }), el("span"), el("span")));
+      for (const g of groups) view.append(collRow(g));
+      return;
+    }
     for (const g of groups) {
       const name = kind === "creator" ? g.name : g._title;
       const media = kind === "creator" ? [...new Set([...(g.set ? g.set._all : []), ...g.recipes.flatMap((r) => r._all)])] : g._all;
@@ -442,6 +479,32 @@
     }
   }
 
+  // How many of a set of recipes have a doc, photos, videos.
+  const tally = (rs) => ({
+    n: rs.length, doc: rs.filter((r) => r.doc_url).length,
+    photos: rs.filter((r) => r._photos.length).length, videos: rs.filter((r) => r._videos.length).length,
+  });
+
+  function collRow(g) {
+    const rs = recipesIn(g);
+    const t = tally(rs);
+    const b = el("button", { type: "button", className: "row coll-row" });
+    b.append(el("div", { className: "big-count" + (t.n ? "" : " zero") },
+      el("strong", { textContent: t.n }), el("span", { textContent: t.n === 1 ? "recipe" : "recipes" })));
+    const text = el("div", { className: "row-text" });
+    text.append(el("h3", { textContent: g._title }));
+    const loose = g._all.filter((m) => !(m._owner && m._owner.kind === "recipe")).length;
+    const subs = [g.kind === "creator" ? "Creator" : "", loose ? `+ ${loose} loose photo${loose === 1 ? "" : "s"}/videos` : ""].filter(Boolean).join(" · ");
+    if (subs) text.append(el("p", { className: "row-sub", textContent: subs }));
+    if (isNew(g)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
+    const strip = el("div", { className: "strip" });
+    const pics = g._all.filter((m) => !isVideo(m));
+    (pics.length ? pics : g._all).slice(0, 2).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
+    b.append(text, ...statCells(t.doc, t.photos, t.videos), strip, el("span", { className: "chev", textContent: "›" }));
+    b.onclick = () => openCollection(g.id);
+    return b;
+  }
+
   function openCollection(id) {
     state.tab = "collections";
     state.coll = id;
@@ -460,42 +523,34 @@
     if (c.summary) head.append(el("p", { className: "summary", textContent: c.summary }));
     head.append(el("div", { className: "actions" }, el("a", { className: "btn small", href: driveFolder(c.id), target: "_blank", rel: "noopener", textContent: "Open folder in Drive" })));
     view.append(head);
-    // Everything inside, at any depth, that's a recipe or a sub-collection.
-    const inside = [];
-    const walk = (s) => { for (const k of s._kids) { if (k.kind === "part") walk(k); else if (!k._mergedInto) inside.push(k); } };
-    walk(c);
-    const rs = inside.filter((k) => k.kind === "recipe" && passes(k));
-    const subs = inside.filter((k) => k.kind !== "recipe");
-    const parts = [rs.length ? `${rs.length} recipe${rs.length === 1 ? "" : "s"}` : "", `${c._photos.length} photos`, `${c._videos.length} videos`].filter(Boolean);
-    $("count").textContent = "";
-    head.insertBefore(el("p", { className: "row-meta", textContent: parts.join(" · ") }), head.querySelector(".actions"));
-    if (subs.length) {
-      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Folders", el("span", { className: "n", textContent: subs.length })));
-      const list = el("div", { className: "rows" });
-      for (const k of subs) {
-        const b = el("button", { type: "button", className: "row" });
-        b.append(el("div", { className: "row-text" }, el("h3", { textContent: k._title }), el("p", { className: "row-meta", textContent: countsText(k) })));
-        const strip = el("div", { className: "strip" });
-        k._all.filter((m) => !isVideo(m)).slice(0, 5).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
-        b.append(strip, el("span", { className: "chev", textContent: "›" }));
-        b.onclick = () => openCollection(k.id);
-        list.append(b);
-      }
-      sec.append(list);
-      view.append(sec);
+    // Every recipe inside, at any depth: the same count the Collections list shows.
+    const all = recipesIn(c);
+    const t = tally(all);
+    const stats = el("div", { className: "coll-stats" });
+    for (const [n, txt] of [[t.n, t.n === 1 ? "recipe" : "recipes"], [t.doc, "with a doc"], [t.photos, "with photos"], [t.videos, "with videos"]]) {
+      stats.append(el("div", { className: "cs" + (n ? "" : " zero") }, el("strong", { textContent: n }), el("span", { textContent: txt })));
     }
+    head.insertBefore(stats, head.querySelector(".actions"));
+    renderControls("recipes");
+    const rs = sortRecipes(all.filter((r) => passes(r)));
+    $("count").textContent = rs.length === all.length ? "" : `${rs.length} of ${all.length} recipes match`;
+    // Group by the sub-folder each recipe sits in (e.g. James Barry › Recipe Images).
+    const subOf = (r) => {
+      let p = state.byId.get(r.parent_id), last = null;
+      while (p && p !== c) { if (p.kind !== "part") last = p; p = state.byId.get(p.parent_id); }
+      return last ? last._title : `Directly in ${c._title}`;
+    };
     if (rs.length) {
-      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Recipes", el("span", { className: "n", textContent: rs.length })));
-      const cards = el("div", { className: "cards" });
-      rs.sort((a, b) => (b._all.length > 0) - (a._all.length > 0) || a._title.localeCompare(b._title)).forEach((r) => cards.append(recipeCard(r)));
-      sec.append(cards);
+      const box = el("div");
+      const grouped = new Set(rs.map(subOf)).size > 1;
+      if (grouped) rs.sort((a, b) => subOf(a).localeCompare(subOf(b)) || 0);
+      renderRecipeList(box, rs, grouped ? subOf : null);
+      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Recipes", el("span", { className: "n", textContent: rs.length })), box);
       view.append(sec);
     }
-    // Loose photos and videos that sit in the collection itself rather than in a recipe.
-    const loose = c._all.filter((m) => m._owner === c);
-    const hasF = state.include.has || new Set();
-    const showP = !hasF.size || hasF.has("photos"), showV = !hasF.size || hasF.has("videos");
-    for (const [title, list] of [["Videos", showV ? loose.filter(isVideo) : []], ["Photos", showP ? loose.filter((m) => !isVideo(m)) : []]]) {
+    // Photos and videos in the collection that don't belong to any recipe.
+    const loose = c._all.filter((m) => !(m._owner && m._owner.kind === "recipe"));
+    for (const [title, list] of [["Other videos (not in a recipe)", loose.filter(isVideo)], ["Other photos (not in a recipe)", loose.filter((m) => !isVideo(m))]]) {
       if (!list.length) continue;
       const sec = el("section", { className: "coll-sec" }, el("h3", {}, title, el("span", { className: "n", textContent: list.length })));
       const grid = el("div", { className: "media-grid" });
@@ -503,7 +558,7 @@
       sec.append(grid);
       view.append(sec);
     }
-    if (!rs.length && !subs.length && !loose.length) view.append(el("p", { className: "empty", textContent: "Nothing in this collection matches." }));
+    if (!rs.length && !loose.length) view.append(el("p", { className: "empty", textContent: "Nothing in this collection matches." }));
   }
 
   let mediaList = [];
