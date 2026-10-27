@@ -204,6 +204,10 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         rows = [r for r in pool.map(one, folders) if r]
+    # Every row needs the same keys for a bulk upsert.
+    blank = {"kind": None, "title": None, "creator": None, "summary": None, "prep_minutes": None, "servings": None,
+             **{k: [] for k in ("flavours", "proteins", "meal", "diet", "ingredients", "method", "season")}}
+    rows = [{**blank, **r} for r in rows]
     for i in range(0, len(rows), 200):
         store._check(store.s.post(
             f"{store.url}/rest/v1/recipe_sets", params={"on_conflict": "id"}, json=rows[i: i + 200],
