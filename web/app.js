@@ -542,7 +542,7 @@
 
     const manual = new Set(img.manual_tags || []);
     $("v-tags").replaceChildren(
-      ...effectiveTags(img).map((t) => {
+      ...effectiveTags(img).filter((t) => !t.startsWith("focus: ")).map((t) => {
         const x = el("button", { type: "button", className: "x", textContent: "×" });
         x.setAttribute("aria-label", `Remove tag ${t}`);
         x.onclick = () => removeTag(img, t);
