@@ -29,7 +29,7 @@ MODEL = os.environ.get("RECIPES_MODEL") or "claude-haiku-5-5"
 FOLDER = "application/vnd.google-apps.folder"
 GDOC = "application/vnd.google-apps.document"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-VERSION = "r2"  # bump to make every folder re-read
+VERSION = "r3"  # bump to make every folder re-read
 
 TOOL = {
     "name": "record_folder",
@@ -86,6 +86,66 @@ def _doc_text(drive, f: dict) -> str:
     except Exception as e:
         return f"(couldn't read document: {type(e).__name__})"
     return ""
+
+
+# Sub-folders with names like these only split up one recipe's files.
+PART_NAME = re.compile(
+    r"^(recipe )?(photos?|pics?|pictures?|images?|imgs?|reels?|videos?|vids?|clips?|footage|raw|edited|edits?|finals?|stills?|"
+    r"b ?roll|stor(y|ies)|thumbnails?|cards?|recipe cards?|assets|graphics?|social|ig|instagram|tiktok|exports?|selects?|"
+    r"drafts?|originals?|hi ?res|low ?res|web|print|jpe?gs?|pngs?|mp4s?|movs?|horizontal|vertical|square|portrait|landscape|"
+    r"\d+x\d+|\d+ ?[x:] ?\d+)$"
+)
+
+
+def _part_name(name: str) -> bool:
+    n = re.sub(r"[^a-z0-9: ]+", " ", name.lower())
+    n = re.sub(r"\b(v\d+|\d{1,2})\b", " ", n)  # "Photos 2", "Reel v1"
+    return bool(PART_NAME.match(re.sub(r"\s+", " ", n).strip()))
+
+
+def _classify(folders: list[dict]) -> None:
+    """Decide recipe / group / part from the folder structure (deepest folders first).
+
+    - A recipe doc (Google Doc or Word file) marks a recipe. Sub-folders under it that have no recipe doc
+      of their own (e.g. "Photos", "Reel", "Recipe Card") are its parts.
+    - A folder whose sub-folders hold recipes with docs is a group (collection or creator), even if it has a doc of its own.
+    - No doc anywhere: two or more dish folders inside make a group; otherwise it's a recipe (photos/videos only),
+      unless its own name says it's just "Photos", "Reel" and so on.
+    """
+    by_id = {f["id"]: f for f in folders}
+    for f in folders:
+        f["doc_here"] = any(k["mimeType"] in (GDOC, DOCX) for k in f["files"])
+        f["media_here"] = sum(k["mimeType"].startswith(("image/", "video/")) for k in f["files"])
+        f["is_part_name"] = _part_name(f["path"].rsplit("/", 1)[-1])
+    for f in sorted(folders, key=lambda x: -x["depth"]):
+        kids = [by_id[s["id"]] for s in f["subs"] if s["id"] in by_id]
+        f["media_tree"] = f["media_here"] + sum(k["media_tree"] for k in kids)
+        # Children that are recipes or groups in their own right (not just "Photos"-style parts).
+        content_kids = [k for k in kids if k["kind"] in ("recipe", "group")]
+        doc_kids = [k for k in content_kids if k["doc_tree"]]
+        f["doc_tree"] = f["doc_here"] or bool(doc_kids)
+        if doc_kids:
+            f["kind"] = "group"            # holds other recipes (with their own docs)
+        elif f["doc_here"]:
+            f["kind"] = "recipe"           # its own doc; sub-folders are just its files
+        elif len(content_kids) >= 2:
+            f["kind"] = "group"            # e.g. "Recipe Images" with a folder per dish
+        elif content_kids:
+            f["kind"] = "recipe"           # one dish folder inside: treat as the same recipe
+        elif f["media_tree"]:
+            f["kind"] = "part" if f["is_part_name"] and f["depth"] > 1 else "recipe"
+        else:
+            f["kind"] = "part"  # empty
+        if f["kind"] == "recipe":
+            for k in kids:
+                _mark_parts(k, by_id)
+
+
+def _mark_parts(f: dict, by_id: dict) -> None:
+    f["kind"] = "part"
+    for s in f["subs"]:
+        if s["id"] in by_id:
+            _mark_parts(by_id[s["id"]], by_id)
 
 
 def _children(drive, folder_id: str) -> list[dict]:
@@ -149,13 +209,14 @@ def main() -> None:
         for s in subs:
             stack.append((s["id"], f"{path}/{s['name']}", fid, depth + 1, s.get("createdTime")))
     print(f"Found {len(folders) - 1} folders.", flush=True)
+    _classify(folders)
 
     client = anthropic.Anthropic(api_key=env("ANTHROPIC_API_KEY"), max_retries=4)
     prompt = _prompt(flavours)
     tokens = [0, 0]
 
     def sig_of(f) -> str:
-        bits = [VERSION, f["path"]] + sorted(f"{k['name']}|{k.get('modifiedTime', '')}" for k in f["files"]) + sorted(s["name"] for s in f["subs"])
+        bits = [VERSION, f["path"], f["kind"]] + sorted(f"{k['name']}|{k.get('modifiedTime', '')}" for k in f["files"]) + sorted(s["name"] for s in f["subs"])
         return hashlib.sha1("\n".join(bits).encode()).hexdigest()
 
     def one(f):
@@ -173,10 +234,16 @@ def main() -> None:
         if f["depth"] == 0:
             row.update(kind="collection", title="Loose files", name="Loose files")
             return row
+        if f["kind"] == "part":  # a sub-folder like "Photos" or "Reel": no AI needed
+            row.update(kind="part", title=row["name"])
+            return row
         text = "\n\n".join(_doc_text(drive, d)[:6000] for d in docs[:2])
         listing = "\n".join(f"- {k['name']}" for k in f["files"][:60])
         subs = ", ".join(s["name"] for s in f["subs"][:40]) or "(none)"
-        msg = (f"Folder path: {f['path']}\nSub-folders: {subs}\nFiles ({len(f['files'])}):\n{listing or '(none)'}\n\n"
+        decided = ("This folder is ONE RECIPE (its sub-folders just hold its photos, videos and cards). Use kind \"recipe\"."
+                   if f["kind"] == "recipe" else
+                   "This folder GROUPS several recipes. Use kind \"creator\" if it's a person, influencer or partner, otherwise \"collection\".")
+        msg = (f"{decided}\n\nFolder path: {f['path']}\nSub-folders: {subs}\nFiles ({len(f['files'])}):\n{listing or '(none)'}\n\n"
                f"Recipe document text:\n{text or '(no document)'}")
         try:
             res = client.messages.create(
@@ -191,11 +258,13 @@ def main() -> None:
                 out = json.loads(t[t.find("{"): t.rfind("}") + 1])
         except Exception as e:
             print(f"  failed {f['path']}: {e}", flush=True)
-            row.update(kind="collection", title=row["name"], sig=None)
+            row.update(kind=f["kind"], title=row["name"], sig=None)
             return row
         lst = lambda k: [str(x).strip() for x in (out.get(k) or []) if str(x).strip()][:12]
+        # The folder structure decides recipe vs group; the AI only picks creator vs collection for groups.
+        kind = "recipe" if f["kind"] == "recipe" else ("creator" if out.get("kind") == "creator" else "collection")
         row.update(
-            kind=out.get("kind") or "collection", title=(out.get("title") or row["name"]).strip(),
+            kind=kind, title=(out.get("title") or row["name"]).strip(),
             creator=(out.get("creator") or "").strip() or None, summary=(out.get("summary") or "").strip() or None,
             flavours=lst("flavours"), proteins=lst("proteins"), meal=lst("meal"), diet=lst("diet"),
             ingredients=lst("ingredients"), method=lst("method"), season=lst("season"),
