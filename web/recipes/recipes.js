@@ -151,7 +151,7 @@
     for (const m of state.media) if (m._owner && m._owner._mergedInto) m._owner = m._owner._mergedInto;
     for (const s of state.sets) {
       let c = null;
-      for (let p = state.byId.get(s.parent_id); p && !c; p = state.byId.get(p.parent_id)) if (p.kind === "collection" && p.depth > 0) c = p;
+      for (let p = state.byId.get(s.parent_id); p && !c; p = state.byId.get(p.parent_id)) if ((p.kind === "collection" || p.kind === "creator") && p.depth > 0) c = p;
       s._coll = c;
       const ids = s._folders || [s.id];
       const made = ids.map((id) => Date.parse((state.byId.get(id) || {}).drive_created_at || "") || 0).filter(Boolean);
@@ -371,7 +371,7 @@
     if (r._created) body.append(el("p", { className: "counts", textContent: `Created ${fmtDate(r._created)}` }));
     b.append(body);
     if (isNew(r)) b.append(el("span", { className: "new-badge", textContent: "NEW" }));
-    b.onclick = () => (r.kind === "collection" ? (closeSheet(), openCollection(r.id)) : openSheet(r.id));
+    b.onclick = () => (r.kind !== "recipe" ? (closeSheet(), openCollection(r.id)) : openSheet(r.id));
     return b;
   }
 
@@ -382,7 +382,7 @@
   ].filter(Boolean).join(" · ") || "No media yet";
 
   function groupsOf(kind) {
-    if (kind === "collection") return state.sets.filter((s) => s.kind === "collection" && s.depth > 0 && !s._mergedInto && (s._all.length || s._kids.length));
+    if (kind === "collection") return state.sets.filter((s) => (s.kind === "collection" || s.kind === "creator") && s.depth > 0 && !s._mergedInto && (s._all.length || s._kids.length));
     // Creators: creator folders, plus anyone named as the creator of recipes elsewhere.
     const map = new Map();
     for (const s of state.sets.filter((x) => x.kind === "creator")) map.set(norm(s._title), { set: s, name: s._title, recipes: [] });
