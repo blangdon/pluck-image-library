@@ -17,10 +17,6 @@
     { id: "flavours", title: "Pluck flavour" },
     { id: "proteins", title: "Protein" },
     { id: "meal", title: "Meal" },
-    { id: "diet", title: "Diet" },
-    { id: "method", title: "Method" },
-    { id: "season", title: "Season / occasion" },
-    { id: "creator", title: "Creator" },
     { id: "has", title: "Has" },
   ];
   const HAS = { photos: "Photos", videos: "Videos", doc: "Recipe doc" };
@@ -121,6 +117,33 @@
       s._text = norm([s._title, s.name, s._creator, s.summary, ...(s.ingredients || []), ...(s.flavours || []),
         ...(s.proteins || []), ...(s.meal || []), ...(s.diet || []), ...(s.method || []), ...(s.season || [])].join(" "));
     }
+    // The same recipe can live in several folders (doc in one, photos or videos in another): merge them.
+    const key = (t) => norm(t).replace(/\((enk|for approval)\)|\benk\b|\bpluck\b|[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const same = new Map();
+    for (const r of state.sets.filter((x) => x.kind === "recipe")) {
+      const k = key(r._title);
+      if (!same.has(k)) same.set(k, []);
+      same.get(k).push(r);
+    }
+    for (const list of same.values()) {
+      if (list.length < 2) continue;
+      list.sort((a, b) => b._all.length - a._all.length || !!b.doc_url - !!a.doc_url);
+      const main = list[0];
+      for (const o of list.slice(1)) {
+        o._mergedInto = main;
+        main._all = [...new Set([...main._all, ...o._all])];
+        main.doc_url = main.doc_url || o.doc_url;
+        main._creator = main._creator || o._creator;
+        main.summary = main.summary || o.summary;
+        for (const f of ["flavours", "proteins", "meal", "diet", "ingredients", "method", "season"]) main[f] = [...new Set([...(main[f] || []), ...(o[f] || [])])];
+        main._folders = [...(main._folders || [main.id]), o.id];
+        main._text += " " + o._text;
+      }
+      main._photos = main._all.filter((m) => !isVideo(m));
+      main._videos = main._all.filter(isVideo);
+      main._hero = main._photos.find((m) => !(m.tags || []).includes("text/graphic")) || main._photos[0] || main._videos[0] || null;
+    }
+    for (const m of state.media) if (m._owner && m._owner._mergedInto) m._owner = m._owner._mergedInto;
   }
 
   async function signThumbs(paths) {
@@ -133,7 +156,7 @@
   }
 
   // ---------------------------------------------------------------- filtering
-  const recipes = () => state.sets.filter((s) => s.kind === "recipe");
+  const recipes = () => state.sets.filter((s) => s.kind === "recipe" && !s._mergedInto);
 
   function passes(r, skipFacet) {
     if (state.q) {
@@ -157,6 +180,7 @@
     const usesFacets = state.tab === "recipes" || state.tab === "media";
     $("side").classList.toggle("muted", !usesFacets);
     box.replaceChildren();
+    box.hidden = !usesFacets;
     for (const f of FACETS) {
       const counts = new Map();
       for (const r of recipes()) {
@@ -217,6 +241,9 @@
     for (const b of $("tabs").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.tab === state.tab);
     renderFacets();
     renderActive();
+    io.disconnect();
+    io._more = null;
+    document.querySelectorAll(".sentinel").forEach((n) => n.remove());
     const view = $("view");
     view.replaceChildren();
     view.className = "";
@@ -238,7 +265,7 @@
   function heroImg(s, cls = "hero") {
     const box = el("div", { className: cls });
     if (s._hero) box.append(el("img", { src: thumb(s._hero), alt: "", loading: "lazy" }));
-    else box.append(el("span", { className: "no-img", textContent: (s._title || "?").slice(0, 1) }));
+    else box.append(el("span", { className: "no-img", textContent: s.doc_url ? "Recipe doc only" : "No photos yet" }));
     if (s._hero && isVideo(s._hero)) box.append(el("span", { className: "play-dot", textContent: "▶" }));
     return box;
   }
@@ -292,25 +319,28 @@
       groups.sort((a, b) => a._title.localeCompare(b._title));
       $("count").textContent = `${groups.length} collections`;
     }
-    view.className = "groups";
+    view.className = "rows";
     if (!groups.length) return view.append(el("p", { className: "empty", textContent: "Nothing matches." }));
     for (const g of groups) {
       const name = kind === "creator" ? g.name : g._title;
       const media = kind === "creator" ? [...new Set([...(g.set ? g.set._all : []), ...g.recipes.flatMap((r) => r._all)])] : g._all;
-      const nRecipes = kind === "creator" ? new Set([...g.recipes, ...(g.set ? g.set._kids.filter((k) => k.kind === "recipe") : [])]).size : g._kids.filter((k) => k.kind === "recipe").length;
-      const b = el("button", { type: "button", className: "group-card" });
-      const mosaic = el("div", { className: "mosaic" });
-      const pics = media.filter((m) => !isVideo(m)).slice(0, 4);
-      (pics.length ? pics : media.slice(0, 4)).forEach((m) => mosaic.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
-      if (!media.length) mosaic.append(el("span", { className: "no-img", textContent: name.slice(0, 1) }));
-      b.append(mosaic);
-      const body = el("div", { className: "card-body" });
-      body.append(el("h3", { textContent: name }));
-      body.append(el("p", { className: "counts", textContent: [
-        nRecipes ? `${nRecipes} recipe${nRecipes === 1 ? "" : "s"}` : "",
-        `${media.length} photo${media.length === 1 ? "" : "s"} & videos`,
-      ].filter(Boolean).join(" · ") }));
-      b.append(body);
+      const rs = kind === "creator"
+        ? [...new Set([...g.recipes, ...(g.set ? g.set._kids.filter((k) => k.kind === "recipe" && !k._mergedInto) : [])])]
+        : g._kids.filter((k) => k.kind === "recipe" && !k._mergedInto);
+      const b = el("button", { type: "button", className: "row" });
+      const text = el("div", { className: "row-text" });
+      text.append(el("h3", { textContent: name }));
+      const nP = media.filter((m) => !isVideo(m)).length, nV = media.length - nP;
+      text.append(el("p", { className: "row-meta", textContent: [
+        rs.length ? `${rs.length} recipe${rs.length === 1 ? "" : "s"}` : "",
+        nP ? `${nP} photo${nP === 1 ? "" : "s"}` : "", nV ? `${nV} video${nV === 1 ? "" : "s"}` : "",
+      ].filter(Boolean).join(" · ") || "Empty" }));
+      if (rs.length) text.append(el("p", { className: "row-sub", textContent: rs.slice(0, 4).map((r) => r._title).join(", ") + (rs.length > 4 ? ` and ${rs.length - 4} more` : "") }));
+      b.append(text);
+      const strip = el("div", { className: "strip" });
+      const pics = media.filter((m) => !isVideo(m));
+      (pics.length ? pics : media).slice(0, 5).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
+      b.append(strip, el("span", { className: "chev", textContent: "›" }));
       b.onclick = () => (kind === "creator" ? openCreator(g) : openSheet(g.id));
       view.append(b);
     }
@@ -392,8 +422,10 @@
   }
 
   function openSheet(id, push = true) {
-    const s = state.byId.get(id);
+    let s = state.byId.get(id);
     if (!s) return;
+    if (s._mergedInto) s = s._mergedInto;
+    id = s.id;
     if (push) history.replaceState(null, "", `#${encodeURIComponent(id)}`);
     const body = $("sheet-body");
     body.replaceChildren();

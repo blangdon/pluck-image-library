@@ -137,3 +137,20 @@
   .tabs button { padding: 7px 12px; white-space: nowrap; }
   .s-info, .s-media { padding-left: 16px; padding-right: 16px; }
 }
+
+/* Creators and collections as a readable list */
+.rows { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 20px; align-items: center; text-align: left;
+  padding: 16px 8px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer;
+}
+.row:hover { background: var(--surface); }
+.row-text { display: grid; gap: 3px; min-width: 0; }
+.row-text h3 { margin: 0; font-size: 18px; }
+.row-meta { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.row-sub { margin: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip { display: flex; gap: 6px; }
+.strip img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.chev { font-size: 24px; color: var(--muted); }
+.hero .no-img, .s-hero .no-img { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; opacity: .8; }
+@media (max-width: 700px) { .strip img:nth-child(n+3) { display: none; } .strip img { width: 52px; height: 52px; } }
