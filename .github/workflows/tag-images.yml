@@ -8,7 +8,7 @@ on:
       mode:
         description: "tag = index and tag; count = just count images (free); compare = Sonnet vs Haiku on 50 images (under $1); faces = face search only; rematch = re-run people matching only"
         type: choice
-        options: [tag, count, count-videos, compare, quality, faces, rematch]
+        options: [tag, count, count-videos, compare, quality, recipes, faces, rematch]
         default: tag
       limit:
         description: "Most images to tag in this run (blank = default 400)"
@@ -60,6 +60,8 @@ jobs:
             python -m tagger --count-videos
           elif [ "${{ inputs.mode }}" = "count" ]; then
             python -m tagger --count
+          elif [ "${{ inputs.mode }}" = "recipes" ]; then
+            echo "Recipes only."
           elif [ "${{ inputs.mode }}" = "quality" ]; then
             python -m tagger --quality-test 50
           elif [ "${{ inputs.mode }}" = "compare" ]; then
@@ -68,14 +70,23 @@ jobs:
             python -m tagger
           fi
       - name: Sort videos (person / POV food)
-        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'rematch' && inputs.mode != 'quality' }}
+        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'rematch' && inputs.mode != 'quality' && inputs.mode != 'recipes' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python -m tagger.video_categories
+      - name: Index recipes (for /recipes)
+        if: ${{ !cancelled() && (inputs.mode == '' || inputs.mode == 'tag' || inputs.mode == 'recipes') }}
+        continue-on-error: ${{ inputs.mode != 'recipes' }}
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m tagger.recipes
       - name: Find people (face search)
-        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'quality' }}
+        if: ${{ !cancelled() && inputs.mode != 'count' && inputs.mode != 'count-videos' && inputs.mode != 'compare' && inputs.mode != 'quality' && inputs.mode != 'recipes' }}
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_IDS: ${{ secrets.DRIVE_FOLDER_IDS }}
