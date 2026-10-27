@@ -107,12 +107,14 @@ def _path_of(drive, folder_id: str) -> str:
     parts = []
     fid = folder_id
     while True:
-        meta = drive.api.files().get(fileId=fid, fields="id, name, parents, driveId", supportsAllDrives=True).execute(num_retries=5)
+        if fid.startswith("0A"):  # the Shared Drive itself
+            parts.append(drive.folder_name(fid))
+            break
+        meta = drive.api.files().get(fileId=fid, fields="id, name, parents", supportsAllDrives=True).execute(num_retries=5)
+        parts.append(meta["name"])
         parents = meta.get("parents") or []
         if not parents:
-            parts.append(drive.folder_name(fid) if fid.startswith("0A") else meta["name"])
             break
-        parts.append(meta["name"])
         fid = parents[0]
     return "/".join(reversed(parts))
 
@@ -219,4 +221,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:
+        import traceback
+
+        tb = traceback.format_exc().strip().splitlines()
+        print("::error title=Recipe reader failed::" + "%0A".join([f"{type(e).__name__}: {e}"] + tb[-6:]), flush=True)
+        raise SystemExit(1)
