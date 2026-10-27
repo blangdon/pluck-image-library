@@ -234,7 +234,7 @@
     const facets = [
       {
         id: "vgroup", title: "Category", mode: "any", media: "video",
-        options: VIDEO_GROUPS.map((g) => ({ key: g.key, label: g.title, test: (i) => videoGroupOf(i) === g.key })),
+        options: VIDEO_GROUPS.filter((g) => g.key !== "other").map((g) => ({ key: g.key, label: g.title, test: (i) => videoGroupOf(i) === g.key })),
       },
       {
         id: "product", title: "Pluck product", mode: "any",
@@ -366,10 +366,6 @@
 
   function refresh() {
     state.shown = state.images.filter((i) => matches(i));
-    if (state.media === "video") {
-      const order = VIDEO_GROUPS.map((g) => g.key);
-      state.shown.sort((a, b) => order.indexOf(videoGroupOf(a)) - order.indexOf(videoGroupOf(b)));
-    }
 
     // Sidebar groups. "any" groups count against everything except their own ticks; "all" groups
     // count within the current result.
@@ -432,26 +428,7 @@
     return b;
   }
 
-  function renderVideoGroups() {
-    const sections = [];
-    let index = 0;
-    for (const g of VIDEO_GROUPS) {
-      const items = state.shown.filter((i) => videoGroupOf(i) === g.key);
-      if (!items.length) continue;
-      const grid = el("div", { className: "grid" });
-      for (const img of items) grid.append(card(img, state.shown.indexOf(img)));
-      index += items.length;
-      sections.push(el("section", { className: "video-group" },
-        el("h2", { className: "group-title" }, g.title, el("span", { className: "group-count", textContent: items.length })),
-        el("p", { className: "group-blurb", textContent: g.blurb }),
-        grid));
-    }
-    $("grid").append(...sections);
-    state.rendered = state.shown.length;
-  }
-
   function renderMore() {
-    if (state.media === "video") return renderVideoGroups();
     const end = Math.min(state.rendered + PAGE, state.shown.length);
     const frag = document.createDocumentFragment();
     for (let i = state.rendered; i < end; i++) frag.append(card(state.shown[i], i));
