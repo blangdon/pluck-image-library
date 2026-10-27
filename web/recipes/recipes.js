@@ -916,7 +916,26 @@
     $("account").hidden = false;
     const { data: allowed, error } = await sb.rpc("is_allowed");
     if (error) return showStatus(`Couldn't check your access: ${error.message}`);
-    if (!allowed) { $("denied-email").textContent = session.user.email; $("gate-denied").hidden = false; return; }
+    if (!allowed) {
+      // Same one-time request flow as the asset library: once approved, every later sign-in goes straight in.
+      const email = session.user.email;
+      $("denied-email").textContent = email; $("gate-denied").hidden = false;
+      const rmsg = $("request-msg"), rbtn = $("request-access");
+      const say = (t) => { rmsg.textContent = t; rmsg.hidden = false; };
+      rbtn.onclick = async () => {
+        rbtn.disabled = true;
+        const { data: st, error: rerr } = await sb.rpc("request_access");
+        if (rerr) { say(`Couldn't send the request: ${rerr.message}`); rbtn.disabled = false; return; }
+        if (st === "approved") return location.reload();
+        if (st === "new") {
+          const meta = session.user.user_metadata || {};
+          try { await fetch(cfg.accessRequestUrl || "https://newgrounddigital.app.n8n.cloud/webhook/pluck-library-access-f481f67f7fdb7ed0", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name: meta.full_name || meta.name || "" }) }); } catch (e) { /* saved either way */ }
+        }
+        rbtn.hidden = true;
+        say(st === "new" ? "Request sent. You'll be able to get in once it's approved; just reload this page then." : "You've already requested access. It's waiting for approval; reload this page once you've been approved.");
+      };
+      return;
+    }
     showStatus("Loading recipes…");
     try {
       if (!(await loadAll())) return showStatus("The recipes haven't been read yet. They'll appear after the next update.");

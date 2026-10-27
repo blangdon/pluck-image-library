@@ -32,9 +32,13 @@
     <button class="btn primary" id="sign-in" type="button">Sign in with Google</button>
   </section>
   <section class="gate" id="gate-denied" hidden>
-    <h1>You're not on the team list yet.</h1>
-    <p>You're signed in as <strong id="denied-email"></strong>. Ask the library's admin to add you.</p>
-    <button class="btn" id="sign-out-2" type="button">Sign out</button>
+    <h1>Request access to the recipe library.</h1>
+    <p>You're signed in as <strong id="denied-email"></strong>, which isn't on the team list yet. Request access and the library's admin will get an email to approve you.</p>
+    <p class="gate-msg" id="request-msg" hidden></p>
+    <div class="gate-actions">
+      <button class="btn primary" id="request-access" type="button">Request access</button>
+      <button class="btn" id="sign-out-2" type="button">Sign out</button>
+    </div>
   </section>
 
   <p class="status" id="status" hidden></p>
