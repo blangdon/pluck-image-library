@@ -38,3 +38,5 @@ alter table recipe_seen enable row level security;
 drop policy if exists "own row" on recipe_seen;
 create policy "own row" on recipe_seen for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid() and is_allowed());
+
+alter table recipe_sets add column if not exists files jsonb not null default '[]';

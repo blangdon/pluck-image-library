@@ -29,7 +29,10 @@ MODEL = os.environ.get("RECIPES_MODEL") or "claude-haiku-5-5"
 FOLDER = "application/vnd.google-apps.folder"
 GDOC = "application/vnd.google-apps.document"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-VERSION = "r4"  # bump to make every folder re-read
+PDF = "application/pdf"
+RECIPE_DOCS = (GDOC, DOCX, PDF)
+SHORTCUT = "application/vnd.google-apps.shortcut"
+VERSION = "r5"  # bump to make every folder re-read
 
 TOOL = {
     "name": "record_folder",
@@ -78,6 +81,11 @@ def _doc_text(drive, f: dict) -> str:
         if f["mimeType"] == GDOC:
             data = drive.api.files().export(fileId=f["id"], mimeType="text/plain").execute(num_retries=3)
             return data.decode("utf-8", "ignore") if isinstance(data, bytes) else str(data)
+        if f["mimeType"] == PDF:
+            from pypdf import PdfReader
+
+            raw = drive.api.files().get_media(fileId=f["id"], supportsAllDrives=True).execute(num_retries=3)
+            return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(raw)).pages[:6])
         if f["mimeType"] == DOCX:
             raw = drive.api.files().get_media(fileId=f["id"], supportsAllDrives=True).execute(num_retries=3)
             xml = zipfile.ZipFile(io.BytesIO(raw)).read("word/document.xml").decode("utf-8", "ignore")
@@ -114,9 +122,10 @@ def _classify(folders: list[dict]) -> None:
     """
     by_id = {f["id"]: f for f in folders}
     for f in folders:
-        f["doc_here"] = any(k["mimeType"] in (GDOC, DOCX) for k in f["files"])
-        f["media_here"] = sum(k["mimeType"].startswith(("image/", "video/")) for k in f["files"])
         f["is_part_name"] = _part_name(f["path"].rsplit("/", 1)[-1])
+        # A recipe doc is a Google Doc, Word file or PDF, unless it sits in a "Recipe Card"/"Photos"-style sub-folder.
+        f["doc_here"] = not f["is_part_name"] and any(k["mimeType"] in RECIPE_DOCS for k in f["files"])
+        f["media_here"] = sum(k["mimeType"].startswith(("image/", "video/")) for k in f["files"])
     for f in sorted(folders, key=lambda x: -x["depth"]):
         kids = [by_id[s["id"]] for s in f["subs"] if s["id"] in by_id]
         f["media_tree"] = f["media_here"] + sum(k["media_tree"] for k in kids)
@@ -231,13 +240,16 @@ def main() -> None:
         sig = sig_of(f)
         if known.get(f["id"]) == sig:
             return None
-        docs = [k for k in f["files"] if k["mimeType"] in (GDOC, DOCX)]
+        docs = sorted([k for k in f["files"] if k["mimeType"] in RECIPE_DOCS], key=lambda k: RECIPE_DOCS.index(k["mimeType"]))
         media = [k for k in f["files"] if k["mimeType"].startswith(("image/", "video/"))]
+        # Every other file (Docs, PDFs, Word, Sheets, Slides, anything) is listed on the recipe.
+        others = [{"id": k["id"], "name": k["name"], "mime": k["mimeType"], "url": k.get("webViewLink")}
+                  for k in f["files"] if not k["mimeType"].startswith(("image/", "video/")) and k["mimeType"] != SHORTCUT]
         row = {
             "id": f["id"], "parent_id": f["parent"], "depth": f["depth"], "name": f["path"].rsplit("/", 1)[-1],
             "folder_path": f["path"], "sig": sig, "doc_id": docs[0]["id"] if docs else None,
             "doc_url": docs[0].get("webViewLink") if docs else None, "media_here": len(media),
-            "drive_created_at": f["created"],
+            "drive_created_at": f["created"], "files": others,
         }
         if f["depth"] == 0:
             row.update(kind="collection", title="Loose files", name="Loose files")

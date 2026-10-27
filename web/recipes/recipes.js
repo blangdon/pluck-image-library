@@ -15,7 +15,7 @@
   const FLAVOUR_ALIASES = { pure: "Pure Organs", "pure organ": "Pure Organs", "pluck original": "Original", "habernero lime": "Habanero Lime" };
   const FACETS = [
     // Switches: nothing ticked shows everything; each one ticked narrows to recipes that have it.
-    { id: "has", title: "Only show recipes with", all: { doc: "Recipe doc", photos: "Photos", videos: "Videos" } },
+    { id: "has", title: "Only show recipes with", all: { doc: "Docs / PDFs", photos: "Photos", videos: "Videos" } },
   ];
   // Every recipe is one of these, by what its folder holds.
   const HAS = {
@@ -116,6 +116,13 @@
       for (let i = parts.length; i > 0 && !deepest; i--) deepest = byPath.get(parts.slice(0, i).join("/"));
       m._owner = owner(deepest);
     }
+    // Documents (Docs, PDFs, Word, Sheets, anything that isn't a photo or video): a folder's own plus its parts'.
+    const docsUnder = (s) => [...(s.files || []), ...s._kids.filter((k) => k.kind === "part").flatMap(docsUnder)];
+    for (const s of state.sets) {
+      s._docs = docsUnder(s);
+      if (!s._docs.length && s.doc_url) s._docs = [{ id: s.doc_id, name: "Recipe doc", mime: "application/vnd.google-apps.document", url: s.doc_url }];
+      s.doc_url = s._docs.length ? s._docs[0].url : null;
+    }
     for (const s of state.sets) {
       s._photos = s._all.filter((m) => !isVideo(m));
       s._videos = s._all.filter(isVideo);
@@ -146,6 +153,7 @@
       for (const o of list.slice(1)) {
         o._mergedInto = main;
         main._all = [...new Set([...main._all, ...o._all])];
+        main._docs = [...main._docs, ...o._docs.filter((d) => !main._docs.some((x) => x.id === d.id))];
         main.doc_url = main.doc_url || o.doc_url;
         main._creator = main._creator || o._creator;
         main.summary = main.summary || o.summary;
@@ -377,7 +385,7 @@
     for (const p of valuesOf(r, "proteins").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: p }));
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     text.append(tags);
-    b.append(t, text, ...statCells(!!r.doc_url, r._photos.length, r._videos.length),
+    b.append(t, text, ...statCells(r._docs.length, r._photos.length, r._videos.length),
       el("p", { className: "row-date", textContent: fmtDate(r._created) }), el("span", { className: "chev", textContent: "›" }));
     if (isNew(r)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
     b.onclick = () => openSheet(r.id);
@@ -404,7 +412,7 @@
     for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
     body.append(tags);
     const has = el("div", { className: "has" });
-    has.append(el("span", { className: "has-doc" + (r.doc_url ? "" : " off"), textContent: "Doc" }),
+    has.append(el("span", { className: "has-doc" + (r._docs.length ? "" : " off"), textContent: r._docs.length > 1 ? `${r._docs.length} docs` : "Doc" }),
       el("span", { className: r._photos.length ? "" : "off", textContent: `${r._photos.length} photo${r._photos.length === 1 ? "" : "s"}` }),
       el("span", { className: r._videos.length ? "" : "off", textContent: `${r._videos.length} video${r._videos.length === 1 ? "" : "s"}` }));
     body.append(has);
@@ -491,7 +499,7 @@
 
   // How many of a set of recipes have a doc, photos, videos.
   const tally = (rs) => ({
-    n: rs.length, doc: rs.filter((r) => r.doc_url).length,
+    n: rs.length, doc: rs.filter((r) => r._docs.length).length,
     photos: rs.filter((r) => r._photos.length).length, videos: rs.filter((r) => r._videos.length).length,
   });
 
@@ -628,6 +636,16 @@
     return [el("dt", { textContent: name }), cell];
   }
 
+  function docType(d) {
+    const m = d.mime || "", n = (d.name || "").toLowerCase();
+    if (m === "application/pdf" || n.endsWith(".pdf")) return { key: "pdf", label: "PDF" };
+    if (m.includes("google-apps.document") || /wordprocessing|msword/.test(m) || /\.docx?$/.test(n)) return { key: "doc", label: "DOC" };
+    if (m.includes("spreadsheet") || /\.(xlsx?|csv)$/.test(n)) return { key: "sheet", label: "SHEET" };
+    if (m.includes("presentation") || /\.(pptx?|key)$/.test(n)) return { key: "slides", label: "SLIDES" };
+    const ext = (n.match(/\.([a-z0-9]{2,5})$/) || [])[1];
+    return { key: "other", label: (ext || "FILE").toUpperCase() };
+  }
+
   function mediaSection(title, list) {
     if (!list.length) return null;
     const sec = el("section", { className: "s-media" });
@@ -695,13 +713,16 @@
       sec.append(row);
       body.append(sec);
     }
-    if (s.doc_url) {
+    if (s._docs.length) {
       const sec = el("section", { className: "s-media" });
-      sec.append(el("h3", {}, "Recipe doc", el("span", { className: "n", textContent: 1 })));
+      sec.append(el("h3", {}, s._docs.length === 1 ? "Document" : "Documents", el("span", { className: "n", textContent: s._docs.length })));
       const grid = el("div", { className: "media-grid small" });
-      const a = el("a", { className: "tile doc-tile", href: s.doc_url, target: "_blank", rel: "noopener", title: "Open the recipe doc" });
-      a.append(el("span", { className: "doc-ico" }), el("span", { className: "doc-name", textContent: s._title }), el("span", { className: "doc-open", textContent: "Open doc ↗" }));
-      grid.append(a);
+      for (const d of s._docs) {
+        const t = docType(d);
+        const a = el("a", { className: "tile doc-tile", href: d.url || `https://drive.google.com/file/d/${encodeURIComponent(d.id)}/view`, target: "_blank", rel: "noopener", title: `Open ${d.name}` });
+        a.append(el("span", { className: `doc-ico t-${t.key}`, textContent: t.label }), el("span", { className: "doc-name", textContent: d.name.replace(/\.[a-z0-9]{2,5}$/i, "") }), el("span", { className: "doc-open", textContent: "Open ↗" }));
+        grid.append(a);
+      }
       sec.append(grid);
       body.append(sec);
     }
