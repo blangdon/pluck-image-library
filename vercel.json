@@ -1,8 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "web",
-  "framework": null,
-  "regions": [
-    "syd1"
-  ]
+  "framework": null
 }
