@@ -14,9 +14,6 @@
 
   const FLAVOUR_ALIASES = { pure: "Pure Organs", "pure organ": "Pure Organs", "pluck original": "Original", "habernero lime": "Habanero Lime" };
   const FACETS = [
-    { id: "flavours", title: "Pluck flavour" },
-    { id: "proteins", title: "Protein" },
-    { id: "meal", title: "Meal" },
     { id: "has", title: "Has" },
   ];
   const HAS = { photos: "Photos", videos: "Videos", doc: "Recipe doc" };
@@ -25,7 +22,7 @@
   const state = {
     sets: [], byId: new Map(), root: null,
     media: [], urls: new Map(),
-    tab: "recipes", q: "", include: {},
+    tab: "recipes", coll: null, q: "", include: {},
   };
   let sb = null;
 
@@ -177,7 +174,7 @@
   // ---------------------------------------------------------------- sidebar
   function renderFacets() {
     const box = $("facets");
-    const usesFacets = state.tab === "recipes" || state.tab === "media";
+    const usesFacets = state.tab === "recipes" || !!state.coll;
     $("side").classList.toggle("muted", !usesFacets);
     box.replaceChildren();
     box.hidden = !usesFacets;
@@ -248,9 +245,8 @@
     view.replaceChildren();
     view.className = "";
     if (state.tab === "recipes") return renderRecipes(view);
-    if (state.tab === "creators") return renderGroups(view, "creator");
-    if (state.tab === "collections") return renderGroups(view, "collection");
-    return renderMedia(view);
+    if (state.coll) return renderCollection(view, state.byId.get(state.coll));
+    return renderGroups(view, "collection");
   }
 
   function renderRecipes(view) {
@@ -283,7 +279,7 @@
     body.append(tags);
     body.append(el("p", { className: "counts", textContent: countsText(r) }));
     b.append(body);
-    b.onclick = () => openSheet(r.id);
+    b.onclick = () => (r.kind === "collection" ? (closeSheet(), openCollection(r.id)) : openSheet(r.id));
     return b;
   }
 
@@ -294,7 +290,7 @@
   ].filter(Boolean).join(" · ") || "No media yet";
 
   function groupsOf(kind) {
-    if (kind === "collection") return state.sets.filter((s) => s.kind === "collection" && (s._all.length || s._kids.length));
+    if (kind === "collection") return state.sets.filter((s) => s.kind === "collection" && s.depth > 0 && !s._mergedInto && (s._all.length || s._kids.length));
     // Creators: creator folders, plus anyone named as the creator of recipes elsewhere.
     const map = new Map();
     for (const s of state.sets.filter((x) => x.kind === "creator")) map.set(norm(s._title), { set: s, name: s._title, recipes: [] });
@@ -341,9 +337,73 @@
       const pics = media.filter((m) => !isVideo(m));
       (pics.length ? pics : media).slice(0, 5).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
       b.append(strip, el("span", { className: "chev", textContent: "›" }));
-      b.onclick = () => (kind === "creator" ? openCreator(g) : openSheet(g.id));
+      b.onclick = () => (kind === "creator" ? openCreator(g) : openCollection(g.id));
       view.append(b);
     }
+  }
+
+  function openCollection(id) {
+    state.tab = "collections";
+    state.coll = id;
+    history.replaceState(null, "", `#c=${encodeURIComponent(id)}`);
+    render();
+    window.scrollTo({ top: 0 });
+  }
+
+  function renderCollection(view, c) {
+    if (!c) { state.coll = null; return render(); }
+    view.className = "coll";
+    const back = el("button", { type: "button", className: "link-btn back", textContent: "‹ All collections" });
+    back.onclick = () => { state.coll = null; history.replaceState(null, "", location.pathname); render(); };
+    const head = el("header", { className: "coll-head" });
+    head.append(back, el("h2", { textContent: c._title }));
+    if (c.summary) head.append(el("p", { className: "summary", textContent: c.summary }));
+    head.append(el("div", { className: "actions" }, el("a", { className: "btn small", href: driveFolder(c.id), target: "_blank", rel: "noopener", textContent: "Open folder in Drive" })));
+    view.append(head);
+    // Everything inside, at any depth, that's a recipe or a sub-collection.
+    const inside = [];
+    const walk = (s) => { for (const k of s._kids) { if (k.kind === "part") walk(k); else if (!k._mergedInto) inside.push(k); } };
+    walk(c);
+    const rs = inside.filter((k) => k.kind === "recipe" && passes(k));
+    const subs = inside.filter((k) => k.kind !== "recipe");
+    const parts = [rs.length ? `${rs.length} recipe${rs.length === 1 ? "" : "s"}` : "", `${c._photos.length} photos`, `${c._videos.length} videos`].filter(Boolean);
+    $("count").textContent = "";
+    head.insertBefore(el("p", { className: "row-meta", textContent: parts.join(" · ") }), head.querySelector(".actions"));
+    if (subs.length) {
+      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Folders", el("span", { className: "n", textContent: subs.length })));
+      const list = el("div", { className: "rows" });
+      for (const k of subs) {
+        const b = el("button", { type: "button", className: "row" });
+        b.append(el("div", { className: "row-text" }, el("h3", { textContent: k._title }), el("p", { className: "row-meta", textContent: countsText(k) })));
+        const strip = el("div", { className: "strip" });
+        k._all.filter((m) => !isVideo(m)).slice(0, 5).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
+        b.append(strip, el("span", { className: "chev", textContent: "›" }));
+        b.onclick = () => openCollection(k.id);
+        list.append(b);
+      }
+      sec.append(list);
+      view.append(sec);
+    }
+    if (rs.length) {
+      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Recipes", el("span", { className: "n", textContent: rs.length })));
+      const cards = el("div", { className: "cards" });
+      rs.sort((a, b) => (b._all.length > 0) - (a._all.length > 0) || a._title.localeCompare(b._title)).forEach((r) => cards.append(recipeCard(r)));
+      sec.append(cards);
+      view.append(sec);
+    }
+    // Loose photos and videos that sit in the collection itself rather than in a recipe.
+    const loose = c._all.filter((m) => m._owner === c);
+    const hasF = state.include.has || new Set();
+    const showP = !hasF.size || hasF.has("photos"), showV = !hasF.size || hasF.has("videos");
+    for (const [title, list] of [["Videos", showV ? loose.filter(isVideo) : []], ["Photos", showP ? loose.filter((m) => !isVideo(m)) : []]]) {
+      if (!list.length) continue;
+      const sec = el("section", { className: "coll-sec" }, el("h3", {}, title, el("span", { className: "n", textContent: list.length })));
+      const grid = el("div", { className: "media-grid" });
+      list.forEach((m) => grid.append(mediaTile(m, list)));
+      sec.append(grid);
+      view.append(sec);
+    }
+    if (!rs.length && !subs.length && !loose.length) view.append(el("p", { className: "empty", textContent: "Nothing in this collection matches." }));
   }
 
   let mediaList = [];
@@ -583,13 +643,13 @@
     $("app").hidden = false;
     $("tabs").hidden = false;
     for (const b of $("tabs").querySelectorAll("button")) {
-      b.onclick = () => { state.tab = b.dataset.tab; render(); window.scrollTo({ top: 0 }); };
+      b.onclick = () => { state.tab = b.dataset.tab; state.coll = null; history.replaceState(null, "", location.pathname); render(); window.scrollTo({ top: 0 }); };
     }
     let t;
     $("q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 150); };
     $("clear").onclick = () => { state.q = ""; $("q").value = ""; state.include = {}; render(); };
     $("s-close").onclick = closeSheet;
-    $("sheet").addEventListener("close", () => { if (location.hash) history.replaceState(null, "", location.pathname); });
+    $("sheet").addEventListener("close", () => { history.replaceState(null, "", state.coll ? `#c=${encodeURIComponent(state.coll)}` : location.pathname); });
     $("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) closeSheet(); });
     $("l-close").onclick = () => $("lightbox").close();
     $("lightbox").addEventListener("click", (e) => { if (e.target === $("lightbox")) $("lightbox").close(); });
@@ -602,8 +662,9 @@
       if (e.key === "ArrowRight" && lb.i < lb.list.length - 1) { lb.i++; fillLightbox(); }
     });
     render();
-    const id = decodeURIComponent(location.hash.slice(1));
-    if (id && state.byId.has(id)) openSheet(id, false);
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (h.startsWith("c=") && state.byId.has(h.slice(2))) openCollection(h.slice(2));
+    else if (h && state.byId.has(h)) openSheet(h, false);
   }
 
   async function boot() {
