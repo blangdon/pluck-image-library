@@ -827,7 +827,13 @@
 
   // ---------------------------------------------------------------- what's new (per person, until dismissed)
   let since = null;  // everything first seen after this time is "new" for this person
-  const seenAt = (x) => Date.parse((x && x.first_seen_at) || 0) || 0;
+  // New = first seen since the last dismiss AND new to Drive (an old file or folder that was just moved here
+  // keeps its original Drive "created" date, far older than when we first saw it, so it doesn't count).
+  const seenAt = (x) => {
+    const seen = Date.parse((x && x.first_seen_at) || 0) || 0;
+    const made = Date.parse((x && x.drive_created_at) || "");
+    return made && made < seen - 3 * 24 * 3600 * 1000 ? 0 : seen;
+  };
   const isNew = (x) => !!since && (seenAt(x) > since || (x._folders || []).some((id) => seenAt(state.byId.get(id)) > since));
 
   async function loadSince(uid) {

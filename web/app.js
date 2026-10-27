@@ -80,7 +80,13 @@
   const isNew = (img) => {
     if (!state.previousVisit) return false;
     const since = dismissedAt && dismissedAt > state.previousVisit ? dismissedAt : state.previousVisit;
-    return new Date(img.first_seen_at) > since;
+    return new Date(img.first_seen_at) > since && newToDrive(img);
+  };
+  // Only files that are new to Drive, not old files moved into a scanned folder: a move keeps the file's
+  // original Drive "created" date, so it's far older than when the library first saw it.
+  const newToDrive = (x) => {
+    const made = Date.parse(x.drive_created_at || ""), seen = Date.parse(x.first_seen_at || "");
+    return !made || !seen || made > seen - 3 * 24 * 3600 * 1000;
   };
   const fmtDate = (s) =>
     s ? new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Unknown";
