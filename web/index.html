@@ -105,8 +105,12 @@
     <div class="viewer-inner">
       <div class="viewer-media">
         <img id="v-img" alt="">
-        <video id="v-video" controls playsinline preload="metadata" hidden></video>
-        <p class="v-hint" id="v-video-hint" hidden>Not playing? <a id="v-video-drive" href="#" target="_blank" rel="noopener">Open it in Google Drive</a>.</p>
+        <button type="button" id="v-video" class="v-play" hidden aria-label="Play video">
+          <img id="v-video-poster" alt="">
+          <span class="v-play-btn" aria-hidden="true"></span>
+          <span class="v-play-label">Play video</span>
+        </button>
+        <p class="v-hint" id="v-video-hint" hidden>Plays in a pop-up window. Pop-up blocked? <a id="v-video-drive" href="#" target="_blank" rel="noopener">Open it in Google Drive</a>.</p>
         <button class="nav prev" id="v-prev" type="button" aria-label="Previous image">‹</button>
         <button class="nav next" id="v-next" type="button" aria-label="Next image">›</button>
       </div>
