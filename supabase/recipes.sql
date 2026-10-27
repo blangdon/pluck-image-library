@@ -27,3 +27,14 @@ create table if not exists recipe_sets (
 alter table recipe_sets enable row level security;
 drop policy if exists "team can read recipes" on recipe_sets;
 create policy "team can read recipes" on recipe_sets for select to authenticated using (is_allowed());
+
+-- "New since you dismissed" on /recipes: when each folder was first found, and each person's last dismiss.
+alter table recipe_sets add column if not exists first_seen_at timestamptz not null default now();
+create table if not exists recipe_seen (
+  user_id      uuid primary key references auth.users on delete cascade,
+  dismissed_at timestamptz not null default now()
+);
+alter table recipe_seen enable row level security;
+drop policy if exists "own row" on recipe_seen;
+create policy "own row" on recipe_seen for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid() and is_allowed());

@@ -50,7 +50,11 @@
       <button class="link-btn" id="clear" type="button" hidden>Clear all filters</button>
     </aside>
     <section class="rx-main">
-      <div class="rx-bar"><p id="count"></p><div class="active" id="active"></div></div>
+      <section class="new-strip" id="new" hidden>
+        <div class="new-top"><strong id="new-title"></strong><button class="btn small" id="new-dismiss" type="button">Dismiss</button></div>
+        <div class="new-items" id="new-items"></div>
+      </section>
+      <div class="rx-bar"><p id="count"></p><div class="active" id="active"></div><div class="controls" id="controls"></div></div>
       <div id="view"></div>
     </section>
   </main>

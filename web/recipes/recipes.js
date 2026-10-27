@@ -25,6 +25,14 @@
     tab: "recipes", coll: null, q: "", include: {},
   };
   let sb = null;
+  const PREF_KEY = "pluck-recipes-prefs";
+  const prefs = (() => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch (e) { return {}; } })();
+  prefs.rView = prefs.rView || "tiles"; prefs.rSort = prefs.rSort || "name"; prefs.cSort = prefs.cSort || "name";
+  const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) {} };
+  const SORTS = {
+    recipes: { name: "Name A–Z", newest: "Newest", collection: "Collection", photos: "Most photos", videos: "Most videos" },
+    collections: { name: "Name A–Z", recipes: "Most recipes", photos: "Most photos", videos: "Most videos", newest: "Newest" },
+  };
 
   // ---------------------------------------------------------------- helpers
   const cap = (s) => s.replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
@@ -57,7 +65,7 @@
     const root = sets.find((s) => s.depth === 0);
     state.root = root ? root.folder_path : sets[0].folder_path.split("/").slice(0, -1).join("/");
 
-    const cols = "id,name,folder_path,mime_type,drive_url,drive_created_at,description,tags,manual_tags,hidden_tags,thumb_path";
+    const cols = "id,name,folder_path,mime_type,drive_url,drive_created_at,first_seen_at,description,tags,manual_tags,hidden_tags,thumb_path";
     const media = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb.from("images").select(cols)
@@ -141,6 +149,12 @@
       main._hero = main._photos.find((m) => !(m.tags || []).includes("text/graphic")) || main._photos[0] || main._videos[0] || null;
     }
     for (const m of state.media) if (m._owner && m._owner._mergedInto) m._owner = m._owner._mergedInto;
+    for (const s of state.sets) {
+      let c = null;
+      for (let p = state.byId.get(s.parent_id); p && !c; p = state.byId.get(p.parent_id)) if (p.kind === "collection" && p.depth > 0) c = p;
+      s._coll = c;
+      s._newest = Math.max(Date.parse(s.first_seen_at || s.updated_at || 0) || 0, ...s._all.map((m) => Date.parse(m.drive_created_at || 0) || 0));
+    }
   }
 
   async function signThumbs(paths) {
@@ -238,6 +252,7 @@
     for (const b of $("tabs").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.tab === state.tab);
     renderFacets();
     renderActive();
+    renderNew();
     io.disconnect();
     io._more = null;
     document.querySelectorAll(".sentinel").forEach((n) => n.remove());
@@ -245,17 +260,76 @@
     view.replaceChildren();
     view.className = "";
     if (state.tab === "recipes") return renderRecipes(view);
-    if (state.coll) return renderCollection(view, state.byId.get(state.coll));
+    if (state.coll) { renderControls(null); return renderCollection(view, state.byId.get(state.coll)); }
     return renderGroups(view, "collection");
   }
 
+  function renderControls(which) {
+    const box = $("controls");
+    box.replaceChildren();
+    if (!which) return;
+    const key = which === "recipes" ? "rSort" : "cSort";
+    const sel = el("select", { id: "sort" });
+    sel.setAttribute("aria-label", "Sort");
+    for (const [k, v] of Object.entries(SORTS[which])) sel.append(el("option", { value: k, textContent: v, selected: prefs[key] === k }));
+    sel.onchange = () => { prefs[key] = sel.value; savePrefs(); render(); };
+    box.append(el("label", { className: "sort" }, el("span", { textContent: "Sort" }), sel));
+    if (which === "recipes") {
+      const seg = el("div", { className: "seg" });
+      for (const [k, v] of [["tiles", "Tiles"], ["list", "List"]]) {
+        const b = el("button", { type: "button", textContent: v });
+        b.setAttribute("aria-pressed", prefs.rView === k);
+        b.onclick = () => { prefs.rView = k; savePrefs(); render(); };
+        seg.append(b);
+      }
+      box.append(seg);
+    }
+  }
+
+  const byName = (a, b) => a._title.localeCompare(b._title);
+  function sortRecipes(list) {
+    const k = prefs.rSort;
+    if (k === "newest") return list.sort((a, b) => b._newest - a._newest || byName(a, b));
+    if (k === "photos") return list.sort((a, b) => b._photos.length - a._photos.length || byName(a, b));
+    if (k === "videos") return list.sort((a, b) => b._videos.length - a._videos.length || byName(a, b));
+    if (k === "collection") return list.sort((a, b) => (a._coll ? 0 : 1) - (b._coll ? 0 : 1) || (a._coll ? a._coll._title : "").localeCompare(b._coll ? b._coll._title : "") || byName(a, b));
+    return list.sort(byName);
+  }
+
   function renderRecipes(view) {
-    const list = recipes().filter((r) => passes(r));
-    list.sort((a, b) => (b._all.length > 0) - (a._all.length > 0) || a._title.localeCompare(b._title));
+    renderControls("recipes");
+    const list = sortRecipes(recipes().filter((r) => passes(r)));
     $("count").textContent = `${list.length} of ${recipes().length} recipes`;
-    view.className = "cards";
+    view.className = prefs.rView === "list" ? "rows" : "cards";
     if (!list.length) return view.append(el("p", { className: "empty", textContent: "No recipes match. Try removing a filter." }));
-    for (const r of list) view.append(recipeCard(r));
+    let lastColl;
+    for (const r of list) {
+      if (prefs.rSort === "collection" && r._coll !== lastColl) {
+        lastColl = r._coll;
+        view.append(el("h3", { className: "group-head", textContent: r._coll ? r._coll._title : "Not in a collection" }));
+      }
+      view.append(prefs.rView === "list" ? recipeRow(r) : recipeCard(r));
+    }
+  }
+
+  function recipeRow(r) {
+    const b = el("button", { type: "button", className: "row recipe-row" });
+    const t = el("div", { className: "row-thumb" });
+    if (r._hero) t.append(el("img", { src: thumb(r._hero), alt: "", loading: "lazy" }));
+    else t.append(el("span", { className: "doc-ico small" }));
+    const text = el("div", { className: "row-text" });
+    text.append(el("h3", { textContent: r._title }));
+    const sub = [r._creator, r._coll && `in ${r._coll._title}`].filter(Boolean).join(" · ");
+    if (sub) text.append(el("p", { className: "row-sub", textContent: sub }));
+    const tags = el("div", { className: "mini" });
+    for (const f of valuesOf(r, "flavours").slice(0, 2)) tags.append(el("span", { className: "pill flavour", textContent: f }));
+    for (const p of valuesOf(r, "proteins").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: p }));
+    for (const m of valuesOf(r, "meal").slice(0, 1)) tags.append(el("span", { className: "pill", textContent: m }));
+    text.append(tags);
+    b.append(t, text, el("p", { className: "row-meta right", textContent: countsText(r) }), el("span", { className: "chev", textContent: "›" }));
+    if (isNew(r)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
+    b.onclick = () => openSheet(r.id);
+    return b;
   }
 
   function heroImg(s, cls = "hero") {
@@ -279,6 +353,7 @@
     body.append(tags);
     body.append(el("p", { className: "counts", textContent: countsText(r) }));
     b.append(body);
+    if (isNew(r)) b.append(el("span", { className: "new-badge", textContent: "NEW" }));
     b.onclick = () => (r.kind === "collection" ? (closeSheet(), openCollection(r.id)) : openSheet(r.id));
     return b;
   }
@@ -312,7 +387,13 @@
       $("count").textContent = `${groups.length} creators`;
     } else {
       groups = groups.filter((s) => !q || s._text.includes(q));
-      groups.sort((a, b) => a._title.localeCompare(b._title));
+      renderControls("collections");
+      const nr = (c) => c._kids.filter((k) => k.kind === "recipe" && !k._mergedInto).length;
+      const k = prefs.cSort;
+      groups.sort(k === "recipes" ? (a, b) => nr(b) - nr(a) || byName(a, b)
+        : k === "photos" ? (a, b) => b._photos.length - a._photos.length || byName(a, b)
+        : k === "videos" ? (a, b) => b._videos.length - a._videos.length || byName(a, b)
+        : k === "newest" ? (a, b) => b._newest - a._newest || byName(a, b) : byName);
       $("count").textContent = `${groups.length} collections`;
     }
     view.className = "rows";
@@ -337,6 +418,7 @@
       const pics = media.filter((m) => !isVideo(m));
       (pics.length ? pics : media).slice(0, 5).forEach((m) => strip.append(el("img", { src: thumb(m), alt: "", loading: "lazy" })));
       b.append(strip, el("span", { className: "chev", textContent: "›" }));
+      if (kind !== "creator" && isNew(g)) text.firstChild.append(el("span", { className: "new-badge", textContent: "NEW" }));
       b.onclick = () => (kind === "creator" ? openCreator(g) : openCollection(g.id));
       view.append(b);
     }
@@ -524,7 +606,6 @@
       info.append(ing);
     }
     const actions = el("div", { className: "actions" });
-    if (s.doc_url) actions.append(el("a", { className: "btn primary", href: s.doc_url, target: "_blank", rel: "noopener", textContent: "Open recipe doc" }));
     actions.append(el("a", { className: "btn", href: driveFolder(s.id), target: "_blank", rel: "noopener", textContent: "Open folder in Drive" }));
     info.append(actions);
     head.append(info);
@@ -539,11 +620,21 @@
       sec.append(row);
       body.append(sec);
     }
+    if (s.doc_url) {
+      const sec = el("section", { className: "s-media" });
+      sec.append(el("h3", {}, "Recipe doc", el("span", { className: "n", textContent: 1 })));
+      const grid = el("div", { className: "media-grid small" });
+      const a = el("a", { className: "tile doc-tile", href: s.doc_url, target: "_blank", rel: "noopener", title: "Open the recipe doc" });
+      a.append(el("span", { className: "doc-ico" }), el("span", { className: "doc-name", textContent: s._title }), el("span", { className: "doc-open", textContent: "Open doc ↗" }));
+      grid.append(a);
+      sec.append(grid);
+      body.append(sec);
+    }
     const sec1 = mediaSection("Photos", s._photos);
     const sec2 = mediaSection("Videos", s._videos);
     if (sec2) body.append(sec2);
     if (sec1) body.append(sec1);
-    if (!s._all.length && !kidsRecipes.length) body.append(el("p", { className: "empty", textContent: "No photos or videos in this folder yet." }));
+    if (!s._all.length && !kidsRecipes.length && !s.doc_url) body.append(el("p", { className: "empty", textContent: "Nothing in this folder yet." }));
 
     if (s.kind === "recipe") {
       const rel = related(s);
@@ -638,6 +729,56 @@
     else window.open(url.replace("/preview", "/view"), "_blank", "noopener");
   }
 
+  // ---------------------------------------------------------------- what's new (per person, until dismissed)
+  let since = null;  // everything first seen after this time is "new" for this person
+  const seenAt = (x) => Date.parse((x && x.first_seen_at) || 0) || 0;
+  const isNew = (x) => !!since && (seenAt(x) > since || (x._folders || []).some((id) => seenAt(state.byId.get(id)) > since));
+
+  async function loadSince(uid) {
+    const { data, error } = await sb.from("recipe_seen").select("dismissed_at").eq("user_id", uid).maybeSingle();
+    if (error) return null;  // not set up yet: no "new" strip
+    if (data) return new Date(data.dismissed_at);
+    await sb.from("recipe_seen").insert({ user_id: uid, dismissed_at: new Date().toISOString() });  // first visit: nothing new yet
+    return null;
+  }
+
+  function renderNew() {
+    const box = $("new");
+    if (!since) { box.hidden = true; return; }
+    const rs = recipes().filter(isNew);
+    const cs = groupsOf("collection").filter(isNew);
+    const ms = state.media.filter((m) => seenAt(m) > since);
+    if (!rs.length && !cs.length && !ms.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const bits = [
+      rs.length && `${rs.length} new recipe${rs.length === 1 ? "" : "s"}`,
+      cs.length && `${cs.length} new collection${cs.length === 1 ? "" : "s"}`,
+      ms.length && `${ms.length} new photo${ms.length === 1 ? "" : "s"} & videos`,
+    ].filter(Boolean);
+    $("new-title").textContent = `${bits.join(", ")} since ${since.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+    const row = $("new-items");
+    row.replaceChildren();
+    const item = (kind, title, go) => {
+      const b = el("button", { type: "button", className: "new-item" }, el("span", { className: "kind", textContent: kind }), el("span", { textContent: title }));
+      b.onclick = go;
+      row.append(b);
+    };
+    for (const c of cs) item("Collection", c._title, () => openCollection(c.id));
+    for (const r of rs) item("Recipe", r._title, () => openSheet(r.id));
+    const owners = [...new Set(ms.map((m) => m._owner).filter((o) => o && o.depth > 0 && !rs.includes(o) && !cs.includes(o)))];
+    for (const o of owners.slice(0, 12)) {
+      const n = ms.filter((m) => m._owner === o).length;
+      item(`${n} new file${n === 1 ? "" : "s"}`, o._title, () => (o.kind === "recipe" ? openSheet(o.id) : openCollection(o.id)));
+    }
+  }
+
+  async function dismissNew(uid) {
+    const now = new Date();
+    await sb.from("recipe_seen").upsert({ user_id: uid, dismissed_at: now.toISOString() });
+    since = null;
+    render();
+  }
+
   // ---------------------------------------------------------------- wiring
   function start() {
     $("app").hidden = false;
@@ -686,6 +827,8 @@
     } catch (e) {
       return showStatus(`Couldn't load recipes: ${e.message}`);
     }
+    since = await loadSince(session.user.id);
+    $("new-dismiss").onclick = () => dismissNew(session.user.id);
     showStatus("");
     start();
   }
