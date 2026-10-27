@@ -29,7 +29,7 @@ MODEL = os.environ.get("RECIPES_MODEL") or "claude-haiku-5-5"
 FOLDER = "application/vnd.google-apps.folder"
 GDOC = "application/vnd.google-apps.document"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-VERSION = "r3"  # bump to make every folder re-read
+VERSION = "r4"  # bump to make every folder re-read
 
 TOOL = {
     "name": "record_folder",
@@ -139,6 +139,14 @@ def _classify(folders: list[dict]) -> None:
         if f["kind"] == "recipe":
             for k in kids:
                 _mark_parts(k, by_id)
+        elif f["kind"] == "group":
+            # Inside a group every folder with content is a recipe, even one named "Photos" or "Recipe Videos".
+            for k in kids:
+                if k["kind"] == "part" and k["media_tree"]:
+                    k["kind"] = "recipe"
+                    for s in k["subs"]:
+                        if s["id"] in by_id:
+                            _mark_parts(by_id[s["id"]], by_id)
 
 
 def _mark_parts(f: dict, by_id: dict) -> None:

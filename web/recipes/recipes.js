@@ -160,7 +160,8 @@
     for (const m of state.media) if (m._owner && m._owner._mergedInto) m._owner = m._owner._mergedInto;
     for (const s of state.sets) {
       let c = null;
-      for (let p = state.byId.get(s.parent_id); p && !c; p = state.byId.get(p.parent_id)) if ((p.kind === "collection" || p.kind === "creator") && p.depth > 0) c = p;
+      // A recipe's collection is the top-level folder it sits under (e.g. James Barry, even via "Recipe Images").
+      for (let p = state.byId.get(s.parent_id); p; p = state.byId.get(p.parent_id)) if (p.depth === 1 && p.kind !== "recipe") c = p;
       s._coll = c;
       const ids = s._folders || [s.id];
       const made = ids.map((id) => Date.parse((state.byId.get(id) || {}).drive_created_at || "") || 0).filter(Boolean);
@@ -421,7 +422,7 @@
   ].filter(Boolean).join(" · ") || "No media yet";
 
   function groupsOf(kind) {
-    if (kind === "collection") return state.sets.filter((s) => (s.kind === "collection" || s.kind === "creator") && s.depth > 0 && !s._mergedInto && (s._all.length || s._kids.length));
+    if (kind === "collection") return state.sets.filter((s) => (s.kind === "collection" || s.kind === "creator") && s.depth === 1 && !s._mergedInto && (s._all.length || s._kids.length));
     // Creators: creator folders, plus anyone named as the creator of recipes elsewhere.
     const map = new Map();
     for (const s of state.sets.filter((x) => x.kind === "creator")) map.set(norm(s._title), { set: s, name: s._title, recipes: [] });
@@ -543,27 +544,19 @@
     renderControls("recipes");
     const rs = sortRecipes(all.filter((r) => passes(r)));
     $("count").textContent = rs.length === all.length ? "" : `${rs.length} of ${all.length} recipes match`;
-    // Group by the sub-folder each recipe sits in (e.g. James Barry › Recipe Images).
-    const subOf = (r) => {
-      let p = state.byId.get(r.parent_id), last = null;
-      while (p && p !== c) { if (p.kind !== "part") last = p; p = state.byId.get(p.parent_id); }
-      return last ? last._title : `Directly in ${c._title}`;
-    };
     if (rs.length) {
       const box = el("div");
-      const grouped = new Set(rs.map(subOf)).size > 1;
-      if (grouped) rs.sort((a, b) => subOf(a).localeCompare(subOf(b)) || 0);
-      renderRecipeList(box, rs, grouped ? subOf : null);
-      const sec = el("section", { className: "coll-sec" }, el("h3", {}, "Recipes", el("span", { className: "n", textContent: rs.length })), box);
-      view.append(sec);
+      renderRecipeList(box, rs, null);
+      view.append(el("section", { className: "coll-sec" }, el("h3", {}, "Recipes", el("span", { className: "n", textContent: rs.length })), box));
     }
-    // Photos and videos in the collection that don't belong to any recipe.
+    // Files saved straight into the collection's own folder (not inside a recipe folder).
     const loose = c._all.filter((m) => !(m._owner && m._owner.kind === "recipe"));
-    for (const [title, list] of [["Other videos (not in a recipe)", loose.filter(isVideo)], ["Other photos (not in a recipe)", loose.filter((m) => !isVideo(m))]]) {
-      if (!list.length) continue;
-      const sec = el("section", { className: "coll-sec" }, el("h3", {}, title, el("span", { className: "n", textContent: list.length })));
+    if (loose.length) {
+      const sec = el("section", { className: "coll-sec" },
+        el("h3", {}, `Saved straight into the ${c._title} folder`, el("span", { className: "n", textContent: loose.length })),
+        el("p", { className: "row-sub", textContent: "These files aren't inside any recipe folder." }));
       const grid = el("div", { className: "media-grid" });
-      list.forEach((m) => grid.append(mediaTile(m, list)));
+      loose.forEach((m) => grid.append(mediaTile(m, loose)));
       sec.append(grid);
       view.append(sec);
     }
