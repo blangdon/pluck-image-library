@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pluck Recipe Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/recipes/recipes.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="wordmark">PLUCK</span>
+      <span class="brand-sub">Recipe Explorer</span>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections" hidden>
+      <button type="button" data-tab="recipes" aria-pressed="true">Recipes</button>
+      <button type="button" data-tab="creators" aria-pressed="false">Creators</button>
+      <button type="button" data-tab="collections" aria-pressed="false">Collections</button>
+      <button type="button" data-tab="media" aria-pressed="false">All media</button>
+    </nav>
+    <div class="account" id="account" hidden>
+      <span id="account-email"></span>
+      <button class="link-btn" id="sign-out" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <section class="gate" id="gate-signin" hidden>
+    <h1>Every Pluck recipe, with its photos and videos.</h1>
+    <p>Sign in with your Google account to explore the recipe and use-case library.</p>
+    <button class="btn primary" id="sign-in" type="button">Sign in with Google</button>
+  </section>
+  <section class="gate" id="gate-denied" hidden>
+    <h1>You're not on the team list yet.</h1>
+    <p>You're signed in as <strong id="denied-email"></strong>. Ask the library's admin to add you.</p>
+    <button class="btn" id="sign-out-2" type="button">Sign out</button>
+  </section>
+
+  <p class="status" id="status" hidden></p>
+
+  <main class="rx" id="app" hidden>
+    <aside class="rx-side" id="side">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span class="visually-hidden">Search</span>
+        <input id="q" type="search" placeholder="Search recipes, ingredients, creators" autocomplete="off">
+      </label>
+      <div id="facets"></div>
+      <button class="link-btn" id="clear" type="button" hidden>Clear all filters</button>
+    </aside>
+    <section class="rx-main">
+      <div class="rx-bar"><p id="count"></p><div class="active" id="active"></div></div>
+      <div id="view"></div>
+    </section>
+  </main>
+
+  <!-- One recipe / creator / collection -->
+  <dialog class="sheet" id="sheet" aria-labelledby="s-title">
+    <button class="close" type="button" id="s-close" aria-label="Close">×</button>
+    <div class="sheet-body" id="sheet-body"></div>
+  </dialog>
+
+  <!-- One photo or video -->
+  <dialog class="lightbox" id="lightbox" aria-label="Media">
+    <button class="close" type="button" id="l-close" aria-label="Close">×</button>
+    <button class="nav prev" type="button" id="l-prev" aria-label="Previous">‹</button>
+    <button class="nav next" type="button" id="l-next" aria-label="Next">›</button>
+    <div class="lb-media" id="l-media"></div>
+    <div class="lb-info"><strong id="l-name"></strong><span id="l-where"></span><a class="btn small" id="l-drive" target="_blank" rel="noopener">Open in Google Drive</a></div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
+  <script src="/config.js"></script>
+  <script src="/recipes/recipes.js"></script>
+</body>
+</html>
