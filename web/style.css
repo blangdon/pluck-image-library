@@ -247,7 +247,7 @@ button, input { font: inherit; color: inherit; }
 @media (max-width: 760px) { .viewer-inner { grid-template-columns: 1fr; overflow-y: auto; } }
 .viewer-media { position: relative; background: var(--bg); display: grid; place-items: center; min-height: 320px; }
 .viewer-media img { max-height: 92vh; width: 100%; object-fit: contain; }
-.viewer-media iframe { width: 100%; height: min(80vh, 720px); border: 0; background: #000; }
+.viewer-media video { width: 100%; height: min(80vh, 720px); border: 0; background: #000; object-fit: contain; }
 .nav {
   position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 999px; border: 0;
   background: var(--surface); color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; box-shadow: var(--shadow);
