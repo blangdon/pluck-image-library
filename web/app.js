@@ -234,6 +234,7 @@
     const facets = [
       {
         id: "vgroup", title: "Category", mode: "any", media: "video",
+        note: "Sorted by what’s in each video’s opening frame.",
         options: VIDEO_GROUPS.filter((g) => g.key !== "other").map((g) => ({ key: g.key, label: g.title, test: (i) => videoGroupOf(i) === g.key })),
       },
       {
