@@ -14,7 +14,8 @@
 
   const FLAVOUR_ALIASES = { pure: "Pure Organs", "pure organ": "Pure Organs", "pluck original": "Original", "habernero lime": "Habanero Lime" };
   const FACETS = [
-    { id: "has", title: "What's in the recipe" },
+    // Switches: nothing ticked shows everything; each one ticked narrows to recipes that have it.
+    { id: "has", title: "Only show recipes with", all: { doc: "Recipe doc", photos: "Photos", videos: "Videos" } },
   ];
   // Every recipe is one of these, by what its folder holds.
   const HAS = {
@@ -54,11 +55,11 @@
   // Values of one facet for a recipe (display form, de-duplicated).
   function valuesOf(r, facet) {
     if (facet === "creator") return r._creator ? [r._creator] : [];
-    if (facet === "has") return [contentsOf(r)];
+    if (facet === "has") return [r.doc_url && "doc", r._photos.length && "photos", r._videos.length && "videos"].filter(Boolean);
     if (facet === "flavours") return [...new Set((r.flavours || []).map(flavourName))];
     return [...new Set((r[facet] || []).map((v) => cap(norm(v))).filter((v) => v && v !== "None"))];
   }
-  const label = (facet, v) => (facet === "has" ? HAS[v] : v);
+  const label = (facet, v) => (facet === "has" ? FACETS[0].all[v] : v);
 
   // ---------------------------------------------------------------- data
   async function loadAll() {
@@ -190,7 +191,7 @@
       const want = state.include[f.id];
       if (!want || !want.size) continue;
       const have = valuesOf(r, f.id);
-      if (!have.some((v) => want.has(v))) return false;
+      if (f.all ? ![...want].every((v) => have.includes(v)) : !have.some((v) => want.has(v))) return false;
     }
     return true;
   }
@@ -205,14 +206,22 @@
     box.hidden = !usesFacets;
     for (const f of FACETS) {
       const counts = new Map();
-      for (const r of recipes()) {
-        if (!passes(r, f.id)) continue;
-        for (const v of valuesOf(r, f.id)) counts.set(v, (counts.get(v) || 0) + 1);
-      }
       const chosen = state.include[f.id] || new Set();
+      const pool = state.coll ? recipesIn(state.byId.get(state.coll) || { _kids: [] }) : recipes();
+      if (f.all) {
+        // Switches: each count is how many recipes you'd see with that switch on (plus the ones already on).
+        for (const v of Object.keys(f.all)) {
+          counts.set(v, pool.filter((r) => passes(r, f.id) && [...chosen, v].every((x) => valuesOf(r, f.id).includes(x))).length);
+        }
+      } else {
+        for (const r of pool) {
+          if (!passes(r, f.id)) continue;
+          for (const v of valuesOf(r, f.id)) counts.set(v, (counts.get(v) || 0) + 1);
+        }
+      }
       for (const v of chosen) if (!counts.has(v)) counts.set(v, 0);
       if (!counts.size) continue;
-      const opts = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const opts = f.all ? [...counts] : [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
       const many = opts.length > 8;
       const group = el("details", { className: "facet", open: f.id !== "creator" || chosen.size > 0 });
       group.append(el("summary", {}, el("span", { textContent: f.title }), chosen.size ? el("span", { className: "facet-n", textContent: chosen.size }) : null));
