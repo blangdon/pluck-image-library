@@ -134,7 +134,11 @@
     }
 
     const { data: allowed, error } = await sb.rpc("is_allowed");
-    if (error) return showStatus(`Couldn't check your access: ${error.message}`);
+    if (error) {
+      // Usually an expired sign-in: ask them to sign in again rather than showing an error.
+      if (/jwt|expired|token/i.test(error.message || "")) { await sb.auth.signOut(); $("gate-signin").hidden = false; return showStatus("Your sign-in expired. Please sign in again."); }
+      return showStatus(`Couldn't check your access: ${error.message}`);
+    }
     if (!allowed) {
       $("denied-email").textContent = email; $("gate-denied").hidden = false;
       const rmsg = $("request-msg"), rbtn = $("request-access");
