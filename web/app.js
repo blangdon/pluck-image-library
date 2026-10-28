@@ -432,7 +432,18 @@
     if (mediaOf(img) === "video") frame.append(el("span", { className: "badge-play", textContent: "▶" }));
     b.append(el("span", { className: "name", textContent: img.name }));
     b.onclick = () => openViewer(index);
-    return b;
+    // Download without opening: sits over the thumbnail's corner (a link can't live inside the card button).
+    const wrap = el("div", { className: "card-wrap" }, b, downloadLink(img, "dl-btn"));
+    return wrap;
+  }
+
+  // Google Drive's own download link for the original file (works for anyone signed in to Google with access).
+  const downloadUrl = (img) => `https://drive.google.com/uc?export=download&id=${encodeURIComponent(img.id)}`;
+  function downloadLink(img, cls) {
+    const a = el("a", { className: cls, href: downloadUrl(img), target: "_blank", rel: "noopener", title: `Download ${img.name}` });
+    a.setAttribute("aria-label", `Download ${img.name}`);
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>';
+    return a;
   }
 
   function renderMore() {
@@ -522,6 +533,7 @@
     }
     $("v-flavours").textContent = flavoursOf(img).join(", ") || "None visible";
     $("v-drive").href = img.drive_url || "#";
+    $("v-download").href = downloadUrl(img);
     $("v-prev").hidden = state.viewerIndex <= 0;
     $("v-next").hidden = state.viewerIndex >= viewerList.length - 1;
     $("v-saved").textContent = "";

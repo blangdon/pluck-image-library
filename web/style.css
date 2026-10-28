@@ -260,7 +260,7 @@ button, input { font: inherit; color: inherit; }
 .add-tag { display: flex; gap: 8px; }
 .add-tag input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
 .v-saved { margin: 0; min-height: 1.2em; font-size: 12px; color: var(--teal); }
-.viewer-info .btn.primary { margin-top: auto; }
+.viewer-info .v-actions { margin-top: auto; display: grid; gap: 8px; }
 
 @media (prefers-reduced-motion: reduce) { .card img { transition: none; } }
 
@@ -274,3 +274,15 @@ button, input { font: inherit; color: inherit; }
 .v-play-btn{position:relative;width:96px;height:96px;border-radius:999px;background:rgba(255,255,255,.95);box-shadow:0 8px 30px rgba(0,0,0,.35)}
 .v-play-btn::after{content:"";position:absolute;left:38px;top:28px;border-style:solid;border-width:20px 0 20px 32px;border-color:transparent transparent transparent #17302d}
 .v-play-label{position:absolute;bottom:22px;color:#fff;font-weight:600;letter-spacing:.02em;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+
+/* Download straight from the grid */
+.card-wrap { position: relative; min-width: 0; }
+.dl-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 999px;
+  display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: #17302d; box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+  opacity: 0; transition: opacity .15s;
+}
+.dl-btn svg { width: 18px; height: 18px; }
+.card-wrap:hover .dl-btn, .dl-btn:focus-visible { opacity: 1; }
+.dl-btn:hover { background: #fff; }
+@media (hover: none) { .dl-btn { opacity: 1; } }

@@ -606,7 +606,22 @@
     b.append(el("img", { src: thumb(m), alt: m.description || m.name, loading: "lazy" }));
     if (isVideo(m)) b.append(el("span", { className: "play-dot", textContent: "▶" }));
     b.onclick = () => openLightbox(list, list.indexOf(m));
-    return b;
+    return el("div", { className: "tile-wrap" }, b, downloadLink(m.id, m.name, m.mime_type));
+  }
+
+  // Download the original from Google Drive. Google Docs/Sheets/Slides download as Word/Excel/PowerPoint.
+  function downloadUrl(id, mime) {
+    const e = encodeURIComponent(id);
+    if ((mime || "").includes("google-apps.document")) return `https://docs.google.com/document/d/${e}/export?format=docx`;
+    if ((mime || "").includes("google-apps.spreadsheet")) return `https://docs.google.com/spreadsheets/d/${e}/export?format=xlsx`;
+    if ((mime || "").includes("google-apps.presentation")) return `https://docs.google.com/presentation/d/${e}/export/pptx`;
+    return `https://drive.google.com/uc?export=download&id=${e}`;
+  }
+  function downloadLink(id, name, mime) {
+    const a = el("a", { className: "dl-btn", href: downloadUrl(id, mime), target: "_blank", rel: "noopener", title: `Download ${name}` });
+    a.setAttribute("aria-label", `Download ${name}`);
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>';
+    return a;
   }
 
   // ---------------------------------------------------------------- recipe / collection sheet
@@ -721,7 +736,7 @@
         const t = docType(d);
         const a = el("a", { className: "tile doc-tile", href: d.url || `https://drive.google.com/file/d/${encodeURIComponent(d.id)}/view`, target: "_blank", rel: "noopener", title: `Open ${d.name}` });
         a.append(el("span", { className: `doc-ico t-${t.key}`, textContent: t.label }), el("span", { className: "doc-name", textContent: d.name.replace(/\.[a-z0-9]{2,5}$/i, "") }), el("span", { className: "doc-open", textContent: "Open ↗" }));
-        grid.append(a);
+        grid.append(el("div", { className: "tile-wrap" }, a, downloadLink(d.id, d.name, d.mime)));
       }
       sec.append(grid);
       body.append(sec);
@@ -810,6 +825,7 @@
       $("l-where").append(a);
     }
     $("l-drive").href = m.drive_url || `https://drive.google.com/file/d/${encodeURIComponent(m.id)}/view`;
+    $("l-download").href = downloadUrl(m.id, m.mime_type);
     $("l-prev").hidden = lb.i <= 0;
     $("l-next").hidden = lb.i >= lb.list.length - 1;
   }

@@ -239,3 +239,16 @@
 .new-item { display: inline-flex; align-items: baseline; gap: 8px; border: 0; border-radius: 999px; padding: 6px 12px; background: rgba(255, 255, 255, .14); color: inherit; cursor: pointer; font-size: 13px; text-align: left; }
 .new-item:hover { background: rgba(255, 255, 255, .24); }
 .new-item .kind { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; opacity: .75; }
+
+/* Download straight from a thumbnail */
+.tile-wrap { position: relative; min-width: 0; }
+.tile-wrap > .tile { width: 100%; }
+.tile-wrap .dl-btn {
+  position: absolute; top: 6px; right: 6px; z-index: 2; width: 30px; height: 30px; border-radius: 999px;
+  display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: #17302d; box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+  opacity: 0; transition: opacity .15s;
+}
+.tile-wrap .dl-btn svg { width: 16px; height: 16px; }
+.tile-wrap:hover .dl-btn, .tile-wrap .dl-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .tile-wrap .dl-btn { opacity: 1; } }
+.lb-info .btn.primary { background: #fff; color: #17302d; border-color: #fff; }
