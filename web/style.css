@@ -286,3 +286,9 @@ button, input { font: inherit; color: inherit; }
 .card-wrap:hover .dl-btn, .dl-btn:focus-visible { opacity: 1; }
 .dl-btn:hover { background: #fff; }
 @media (hover: none) { .dl-btn { opacity: 1; } }
+
+.result-bar { align-items: center; }
+.shuffle-btn { margin-left: auto; }
+.shuffle-btn svg { width: 15px; height: 15px; }
+.shuffle-btn[aria-pressed="true"] { background: transparent; color: var(--ink); border-color: var(--ink); }
+#unshuffle { font-size: 13px; }

@@ -373,6 +373,11 @@
 
   function refresh() {
     state.shown = state.images.filter((i) => matches(i));
+    if (state.shuffle) {
+      // Stable random order for this shuffle (filters keep it), newest-first again when switched off.
+      const key = (i) => { let h = state.shuffle; for (const c of i.id) h = Math.imul(h ^ c.charCodeAt(0), 2654435761); return h >>> 0; };
+      state.shown.sort((a, b) => key(a) - key(b));
+    }
 
     // Sidebar groups. "any" groups count against everything except their own ticks; "all" groups
     // count within the current result.
@@ -610,6 +615,21 @@
 
   // ---------------------------------------------------------------- wiring
   function start() {
+    $("shuffle").onclick = () => {
+      // First click shuffles; later clicks reshuffle. "Newest first" turns it off.
+      state.shuffle = (Math.random() * 2 ** 31) | 1;
+      $("shuffle").setAttribute("aria-pressed", "true");
+      $("shuffle-label").textContent = "Shuffle again";
+      $("unshuffle").hidden = false;
+      refresh();
+    };
+    $("unshuffle").onclick = () => {
+      state.shuffle = 0;
+      $("shuffle").setAttribute("aria-pressed", "false");
+      $("shuffle-label").textContent = "Shuffle";
+      $("unshuffle").hidden = true;
+      refresh();
+    };
     $("app").hidden = false;
     buildFacets();
     renderNewStrip();
