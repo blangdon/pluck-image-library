@@ -252,3 +252,9 @@
 .tile-wrap:hover .dl-btn, .tile-wrap .dl-btn:focus-visible { opacity: 1; }
 @media (hover: none) { .tile-wrap .dl-btn { opacity: 1; } }
 .lb-info .btn.primary { background: #fff; color: #17302d; border-color: #fff; }
+
+/* Sortable column headers */
+.sort-head { border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; text-align: left; }
+.sort-head.num { text-align: center; }
+.sort-head:hover { color: var(--ink); }
+.sort-head.on { color: var(--teal); font-weight: 600; }

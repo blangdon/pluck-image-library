@@ -39,8 +39,8 @@
   prefs.rView = prefs.rView || "tiles"; prefs.rSort = prefs.rSort || "name"; prefs.cSort = prefs.cSort || "name";
   const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) {} };
   const SORTS = {
-    recipes: { name: "Name A–Z", newest: "Date created (newest)", oldest: "Date created (oldest)", collection: "Collection", photos: "Most photos", videos: "Most videos" },
-    collections: { name: "Name A–Z", recipes: "Most recipes", photos: "Most photos", videos: "Most videos", newest: "Newest" },
+    recipes: { name: "Name A–Z", newest: "Date created (newest)", oldest: "Date created (oldest)", collection: "Collection", docs: "Most docs", photos: "Most photos", videos: "Most videos" },
+    collections: { name: "Name A–Z", recipes: "Most recipes", docs: "Most with a doc", photos: "Most with photos", videos: "Most with videos", newest: "Newest" },
   };
 
   // ---------------------------------------------------------------- helpers
@@ -301,7 +301,7 @@
     const sel = el("select", { id: "sort" });
     sel.setAttribute("aria-label", "Sort");
     for (const [k, v] of Object.entries(SORTS[which])) sel.append(el("option", { value: k, textContent: v, selected: prefs[key] === k }));
-    sel.onchange = () => { prefs[key] = sel.value; savePrefs(); render(); };
+    sel.onchange = () => { prefs[key] = sel.value; prefs[key[0] + "Rev"] = false; savePrefs(); render(); };
     box.append(el("label", { className: "sort" }, el("span", { textContent: "Sort" }), sel));
     if (which === "recipes") {
       const seg = el("div", { className: "seg" });
@@ -328,10 +328,31 @@
     const k = prefs.rSort;
     if (k === "newest") return list.sort((a, b) => b._newest - a._newest || byName(a, b));
     if (k === "oldest") return list.sort((a, b) => (a._newest || Infinity) - (b._newest || Infinity) || byName(a, b));
-    if (k === "photos") return list.sort((a, b) => b._photos.length - a._photos.length || byName(a, b));
-    if (k === "videos") return list.sort((a, b) => b._videos.length - a._videos.length || byName(a, b));
+    if (k === "photos") return flip(list.sort((a, b) => b._photos.length - a._photos.length || byName(a, b)), "r");
+    if (k === "videos") return flip(list.sort((a, b) => b._videos.length - a._videos.length || byName(a, b)), "r");
+    if (k === "docs") return flip(list.sort((a, b) => b._docs.length - a._docs.length || byName(a, b)), "r");
     if (k === "collection") return list.sort((a, b) => (a._coll ? 0 : 1) - (b._coll ? 0 : 1) || (a._coll ? a._coll._title : "").localeCompare(b._coll ? b._coll._title : "") || byName(a, b));
-    return list.sort(byName);
+    return flip(list.sort(byName), "r");
+  }
+  // Clicking the same column header again reverses it.
+  const flip = (list, which) => (prefs[which + "Rev"] ? list.reverse() : list);
+
+  // A clickable column header that sorts the list (and shows which way).
+  function sortHead(text, key, which, cls = "") {
+    const pk = which === "r" ? "rSort" : "cSort";
+    const on = prefs[pk] === key || (key === "newest" && prefs[pk] === "oldest");
+    const b = el("button", { type: "button", className: `sort-head ${cls}${on ? " on" : ""}` });
+    b.append(text, el("span", { className: "arrow", textContent: on ? (prefs[which + "Rev"] || prefs[pk] === "oldest" ? " ↑" : " ↓") : "" }));
+    b.title = `Sort by ${text.toLowerCase()}`;
+    b.onclick = () => {
+      if (on) {
+        if (key === "newest") { prefs[pk] = prefs[pk] === "newest" ? "oldest" : "newest"; prefs[which + "Rev"] = false; }
+        else prefs[which + "Rev"] = !prefs[which + "Rev"];
+      } else { prefs[pk] = key; prefs[which + "Rev"] = false; }
+      savePrefs();
+      render();
+    };
+    return b;
   }
 
   function renderRecipes(view) {
@@ -361,9 +382,9 @@
     }
   }
 
-  const recipeHead = () => el("div", { className: "row-head" }, el("span"), el("span", { textContent: "Recipe" }),
-    el("span", { className: "num", textContent: "Doc" }), el("span", { className: "num", textContent: "Photos" }),
-    el("span", { className: "num", textContent: "Videos" }), el("span", { textContent: "Date created" }), el("span"));
+  const recipeHead = () => el("div", { className: "row-head" }, el("span"), sortHead("Recipe", "name", "r"),
+    sortHead("Docs", "docs", "r", "num"), sortHead("Photos", "photos", "r", "num"),
+    sortHead("Videos", "videos", "r", "num"), sortHead("Date created", "newest", "r"), el("span"));
 
   // Doc / photos / videos as three fixed cells, so a column of recipes scans at a glance.
   function statCells(docs, photos, videos) {
@@ -455,18 +476,22 @@
       renderControls("collections");
       const nr = (c) => recipesIn(c).length;
       const k = prefs.cSort;
+      // Doc / photos / videos sort by how many of the collection's recipes have them (the numbers shown).
+      const t = new Map(groups.map((g) => [g, tally(recipesIn(g))]));
       groups.sort(k === "recipes" ? (a, b) => nr(b) - nr(a) || byName(a, b)
-        : k === "photos" ? (a, b) => b._photos.length - a._photos.length || byName(a, b)
-        : k === "videos" ? (a, b) => b._videos.length - a._videos.length || byName(a, b)
+        : k === "docs" ? (a, b) => t.get(b).doc - t.get(a).doc || byName(a, b)
+        : k === "photos" ? (a, b) => t.get(b).photos - t.get(a).photos || byName(a, b)
+        : k === "videos" ? (a, b) => t.get(b).videos - t.get(a).videos || byName(a, b)
         : k === "newest" ? (a, b) => b._newest - a._newest || byName(a, b) : byName);
+      flip(groups, "c");
       $("count").textContent = `${groups.length} collections`;
     }
     view.className = "rows";
     if (!groups.length) return view.append(el("p", { className: "empty", textContent: "Nothing matches." }));
     if (kind !== "creator") {
-      view.append(el("div", { className: "row-head coll-head-row" }, el("span", { textContent: "Recipes" }), el("span", { textContent: "Collection" }),
-        el("span", { className: "num", textContent: "With doc" }), el("span", { className: "num", textContent: "With photos" }),
-        el("span", { className: "num", textContent: "With videos" }), el("span"), el("span")));
+      view.append(el("div", { className: "row-head coll-head-row" }, sortHead("Recipes", "recipes", "c"), sortHead("Collection", "name", "c"),
+        sortHead("With doc", "docs", "c", "num"), sortHead("With photos", "photos", "c", "num"),
+        sortHead("With videos", "videos", "c", "num"), el("span"), el("span")));
       for (const g of groups) view.append(collRow(g));
       return;
     }
