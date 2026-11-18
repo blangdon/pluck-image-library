@@ -108,6 +108,7 @@
   async function boot() {
     if (demo) return startDemo();
     sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    if (window.pluckTrack) window.pluckTrack('assets', async () => { const { data } = await sb.auth.getSession(); return (data && data.session && data.session.access_token) || ''; });
     $("sign-in").onclick = () =>
       sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
     $("sign-out").onclick = $("sign-out-2").onclick = async () => { await sb.auth.signOut(); location.reload(); };
