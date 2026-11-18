@@ -42,6 +42,10 @@
   let sb = null;
 
   // ---------------------------------------------------------------- helpers
+  // Everything filed under 02_Content Library > UGC > TikTok UGC Only (and its subfolders) gets the TikTok tag.
+  // Blocked folders (tagger/excluded_folders.txt) are never in the library at all, so they can never get it.
+  const TIKTOK_FOLDER = /(^|\/)02_Content Library\/UGC\/TikTok UGC Only(\/|$)/i;
+  const isTikTok = (img) => !img.removed && TIKTOK_FOLDER.test(img.folder_path || "");
   const effectiveTags = (img) => {
     const hidden = new Set(img.hidden_tags || []);
     const out = [];
@@ -49,6 +53,7 @@
       const t = TAG_RENAMES[raw] || raw;
       if (!hidden.has(raw) && !hidden.has(t) && !out.includes(t)) out.push(t);
     }
+    if (isTikTok(img) && !hidden.has("TikTok") && !out.includes("TikTok")) out.push("TikTok");
     return out;
   };
   const flavoursOf = (img) => [...new Set((img.flavours || []).map((f) => FLAVOUR_ALIASES[f.toLowerCase()] || f))];
@@ -239,13 +244,18 @@
     const HIDDEN = ["boxes & retail", "behind the scenes"];  // still tagged, just not offered as filters
     const shotTags = [...allTags].filter((t) =>
       !PRODUCT_TAGS.includes(t) && !STYLE_TAGS.includes(t) && !allPeople.has(t) && !HIDDEN.includes(t) &&
-      !t.startsWith("focus: "));  // video sorting labels, used only for the video groups
+      !t.startsWith("focus: ") && t !== "TikTok");  // TikTok has its own sidebar link  // video sorting labels, used only for the video groups
     const definite = (d) => (img) => [d, "mixed"].includes(designOf(img));
     const facets = [
       {
         id: "vgroup", title: "Category", mode: "any", media: "video",
         note: "Sorted by what’s in each video’s opening frame.",
         options: VIDEO_GROUPS.filter((g) => g.key !== "other").map((g) => ({ key: g.key, label: g.title, test: (i) => videoGroupOf(i) === g.key })),
+      },
+      {
+        id: "tiktok", title: "TikTok", mode: "any", media: "video",
+        note: "Everything in 02_Content Library › UGC › TikTok UGC Only.",
+        options: [{ key: "tiktok", label: "TikTok", test: isTikTok }],
       },
       {
         id: "product", title: "Pluck product", mode: "any",
