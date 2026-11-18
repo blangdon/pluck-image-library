@@ -198,7 +198,7 @@ def _path_of(drive, folder_id: str) -> str:
 
 def main() -> None:
     from .__main__ import env
-    from .drive import Drive
+    from .drive import EXCLUDED, Drive
     from .store import Store
 
     config = yaml.safe_load((HERE / "config.yaml").read_text())
@@ -224,6 +224,8 @@ def main() -> None:
         files = [k for k in kids if k["mimeType"] != FOLDER and not k["name"].startswith(".")]
         folders.append({"id": fid, "path": path, "parent": parent, "depth": depth, "subs": subs, "files": files, "created": created})
         for s in subs:
+            if s["id"] in EXCLUDED:  # tagger/excluded_folders.txt
+                continue
             stack.append((s["id"], f"{path}/{s['name']}", fid, depth + 1, s.get("createdTime")))
     print(f"Found {len(folders) - 1} folders.", flush=True)
     _classify(folders)

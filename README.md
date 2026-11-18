@@ -70,6 +70,7 @@ Nothing is ever written to Drive. The tagger has read-only access.
 - **Label design:** *current* = the cow stands inside a circle on the front of the label; *previous* = no circle; *unknown* = only the back or side is visible, or it's too small to tell. Unknown images appear under both Current and Previous. Colours are ignored.
 - **Flavours:** names read off labels are matched to the list in `config.yaml`; `flavour_aliases` merges other spellings (e.g. "Pure" → Pure Organs).
 - **Better shaker recognition:** add clear photos to `tagger/reference/` and list them under `reference_images` in `config.yaml`.
+- **Keep a folder out of the library:** add its folder ID to `tagger/excluded_folders.txt`. Everything inside it is skipped, and anything already in the library from it is hidden on the next run.
 - **Failures** are retried up to 3 times. The reason is saved in the `tag_error` column. Formats Pillow can't read (RAW, PSD) fall back to Drive's own preview.
 
 ## Finding people (face search)

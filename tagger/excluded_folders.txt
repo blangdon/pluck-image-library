@@ -1,0 +1,4 @@
+# Drive folders the library must never read. One folder ID per line (the part after /folders/ in the address).
+# Everything inside them, including subfolders, is skipped. Files already in the library from these folders
+# are hidden on the next run (marked removed; nothing in Drive is touched).
+1Rvxw3K2afagvhANxp45ch_VfzZqngtZH  # "For Approval" (blocked 2026-11-18)

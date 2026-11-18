@@ -15,6 +15,19 @@ from googleapiclient.http import MediaIoBaseDownload
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 FOLDER = "application/vnd.google-apps.folder"
+
+
+def excluded_folders() -> set[str]:
+    """Folder IDs listed in tagger/excluded_folders.txt: never read, including everything inside them."""
+    from pathlib import Path
+
+    f = Path(__file__).parent / "excluded_folders.txt"
+    if not f.exists():
+        return set()
+    return {ln.split("#", 1)[0].strip() for ln in f.read_text().splitlines() if ln.split("#", 1)[0].strip()}
+
+
+EXCLUDED = excluded_folders()
 FIELDS = (
     "nextPageToken, files(id, name, mimeType, md5Checksum, size, createdTime, modifiedTime, "
     "webViewLink, thumbnailLink, imageMediaMetadata(width, height), videoMediaMetadata(durationMillis, width, height), "
@@ -95,7 +108,7 @@ class Drive:
         stack = [(fid, self.folder_name(fid)) for fid in root_ids]
         while stack:
             folder_id, path = stack.pop()
-            if folder_id in seen_folders:
+            if folder_id in seen_folders or folder_id in EXCLUDED:
                 continue
             seen_folders.add(folder_id)
             for f in self._children(folder_id):
